@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:flutter/services.dart';
 import '../widgets/task_item.dart';
 import '../widgets/action_item.dart';
 import '../widgets/quick_action_button.dart';
@@ -41,20 +44,102 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _sendSearch() {
-    // Implement search functionality here
-    print("Searching for: ${_searchController.text}");
-    // You can add your search logic here
+
+Future<void> _sendSearch() async {
+  final searchText = _searchController.text.trim();
+  
+  // Regex patterns to detect YouTube commands
+  final RegExp youtubeSearchPattern = RegExp(
+    r'^(?:open\s+youtube\s+and\s+search|search\s+(?:on|in)\s+youtube\s+for|youtube\s+search)(?:\s+for)?\s+(.+)$',
+    caseSensitive: false
+  );
+  
+  final RegExp youtubeOpenPattern = RegExp(
+    r'^open\s+youtube$',
+    caseSensitive: false
+  );
+  
+  // Check if text matches YouTube search pattern
+  final youtubeSearchMatch = youtubeSearchPattern.firstMatch(searchText);
+  final isYoutubeOpen = youtubeOpenPattern.hasMatch(searchText);
+  
+  if (youtubeSearchMatch != null) {
+    // Extract the search query from the command
+    final searchQuery = youtubeSearchMatch.group(1)?.trim() ?? '';
     
-    // Optionally clear the search field after sending
-    // _searchController.clear();
-    _searchFocusNode.unfocus();
+    if (searchQuery.isNotEmpty) {
+      try {
+        // Use AndroidIntent to launch YouTube with search
+        final intent = AndroidIntent(
+          action: 'android.intent.action.VIEW',
+          package: 'com.google.android.youtube',
+          data: 'https://www.youtube.com/results?search_query=${Uri.encodeComponent(searchQuery)}',
+        );
+        await intent.launch();
+        
+        // Show confirmation
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Searching YouTube for: $searchQuery')),
+        );
+      } on PlatformException {
+        // Fall back to web if the app isn't installed
+        final Uri webUri = Uri.parse('https://www.youtube.com/results?search_query=${Uri.encodeComponent(searchQuery)}');
+        try {
+          await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        } catch (e) {
+          // ignore: use_build_context_synchronously
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not launch YouTube: $e')),
+          );
+        }
+      }
+    }
+  } else if (isYoutubeOpen) {
+    // Just open YouTube homepage
+    try {
+      final intent = AndroidIntent(
+        action: 'android.intent.action.VIEW',
+        package: 'com.google.android.youtube',
+        data: 'https://www.youtube.com/',
+      );
+      await intent.launch();
+      
+      // Show confirmation
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Opening YouTube')),
+      );
+    } on PlatformException {
+      // Fall back to web if the app isn't installed
+      final Uri webUri = Uri.parse('https://www.youtube.com/');
+      try {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not launch YouTube: $e')),
+        );
+      }
+    }
+  } else {
+    // Not a YouTube command - handle differently or show message
+    // ignore: use_build_context_synchronously
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('I understand: "$searchText" (not a YouTube command)')),
+    );
+    
+    // Here you would add your NLP processing in the future
   }
+  
+  // Clear the search field and unfocus to hide keyboard
+  _searchController.clear();
+  _searchFocusNode.unfocus();
+}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Use resizeToAvoidBottomInset to prevent keyboard from causing overflow
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -63,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Search Bar - Now Interactive with Send Button
+                // Search Bar with YouTube integration
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
@@ -207,8 +292,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 
-                // Add extra space at the bottom to ensure everything is accessible
-                // when the keyboard is open
                 const SizedBox(height: 80),
               ],
             ),
