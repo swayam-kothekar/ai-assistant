@@ -3,6 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart'; // For date formatting
+// import 'package:contacts_service/contacts_service.dart'; // For accessing contacts
+import 'package:flutter_contacts/flutter_contacts.dart';
 
 // Callback types for updating UI state
 typedef TaskStartCallback = void Function(String taskTitle, List<String> steps);
@@ -17,7 +19,9 @@ class SearchService {
     'google par search karo': 'search on google for',
     'google per search karo': 'search on google for',
     'youtube kholo aur search karo': 'open youtube and search',
+    'YouTube kholo aur search karo': 'open youtube and search',
     'youtube kholo': 'open youtube',
+    'YouTube kholo': 'open youtube',
     'calendar dikhao': 'open calendar',
     'event add karo': 'add event',
     'maps kholo': 'open maps',
@@ -32,6 +36,11 @@ class SearchService {
     'kal meeting hai': 'meeting tomorrow',
     'aaj ka plan batao': 'show plan for today',
   };
+
+  static final RegExp _paymentPattern = RegExp(
+  r'^pay\s+(?:rs|rupees?)?\s*(\d+)\s+(?:rs|rupees?)?\s+to\s+(.+)$',
+  caseSensitive: false,
+  );
 
   // Method to translate Hinglish to English
   String _translateHinglishToEnglish(String input) {
@@ -226,6 +235,9 @@ class SearchService {
     final translatedText = _translateHinglishToEnglish(searchText);
     final trimmedText = translatedText.trim();
 
+    // Check if text matches payment pattern
+    final paymentMatch = _paymentPattern.firstMatch(trimmedText);
+
     // Check if text matches Google search pattern
     final googleSearchMatch = _googleSearchPattern.firstMatch(trimmedText);
 
@@ -245,7 +257,18 @@ class SearchService {
     final isCameraOpen = _cameraOpenPattern.hasMatch(trimmedText);
     final isGalleryOpen = _galleryOpenPattern.hasMatch(trimmedText);
 
-    if (googleSearchMatch != null) {
+    if (paymentMatch != null) {
+      final amount = paymentMatch.group(1);
+      final name = paymentMatch.group(2)?.trim() ?? '';
+      await _handlePayment(
+        amount: amount ?? '',
+        name: name,
+        onTaskStart: onTaskStart,
+        onTaskProgress: onTaskProgress,
+        onError: onError,
+        context: context,
+      );
+      } else if (googleSearchMatch != null) {
       await _handleGoogleSearch(
         searchQuery: googleSearchMatch.group(1)?.trim() ?? '',
         onTaskStart: onTaskStart,
@@ -335,6 +358,141 @@ class SearchService {
       );
     }
   }
+
+  // Handle payment command
+  Future<void> _handlePayment({
+  required String amount,
+  required String name,
+  required TaskStartCallback onTaskStart,
+  required TaskProgressCallback onTaskProgress,
+  required ErrorCallback onError,
+  required BuildContext context,
+}) async {
+  onTaskStart("Processing Payment", [
+    "Finding contacts matching: $name",
+    "Selecting contact",
+    "Initiating payment",
+  ]);
+
+  onTaskProgress(0);
+
+  // Request contact permissions
+  if (!await FlutterContacts.requestPermission()) {
+    onError("Permission denied to access contacts");
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Permission denied to access contacts')),
+      );
+    }
+    return;
+  }
+
+  // Fetch all contacts
+  final contacts = await FlutterContacts.getContacts(withProperties: true);
+
+// Now you can filter by name
+final matchingContacts = contacts.where((contact) => 
+  contact.displayName.toLowerCase().contains(name.toLowerCase())
+).toList();
+
+  onTaskProgress(1);
+
+  if (matchingContacts.isEmpty) {
+    onError("No contacts found matching: $name");
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No contacts found matching: $name')),
+      );
+    }
+    return;
+  }
+
+  // Prompt user to select a contact
+  final selectedContact = await _showContactSelectionDialog(
+    context: context,
+    contacts: matchingContacts,
+  );
+
+  if (selectedContact == null) {
+    onError("No contact selected");
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No contact selected')),
+      );
+    }
+    return;
+  }
+
+  onTaskProgress(2);
+
+  // Get the UPI ID from the selected contact
+  // Initiate UPI payment
+final phoneNumber = selectedContact.phones.isNotEmpty 
+    ? selectedContact.phones.first.number.replaceAll(RegExp(r'[^\d]'), '') 
+    : '';
+
+// Remove the country code "91" from the beginning if it exists
+final formattedPhone = phoneNumber.startsWith('91') 
+    ? phoneNumber.substring(2) 
+    : phoneNumber;
+
+if (formattedPhone.isEmpty) {
+  onError("No phone number found for selected contact");
+
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('No phone number found for selected contact')),
+    );
+  }
+  return;
+}
+
+// Use the formatted phone number in the UPI payment URI
+final paymentUri = Uri.parse('upi://pay?pa=$formattedPhone@upi&am=$amount&cu=INR');
+
+try {
+  await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
+  onTaskProgress(3);
+} catch (e) {
+  onError("Could not initiate payment: $e");
+
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Could not initiate payment: $e')),
+    );
+  }
+}
+}
+
+  // Show a dialog to select a contact
+  Future<Contact?> _showContactSelectionDialog({
+  required BuildContext context,
+  required List<Contact> contacts,
+}) async {
+  return await showDialog<Contact>(
+  context: context,
+  builder: (BuildContext context) {
+    return AlertDialog(
+      title: Text('Select a contact'),
+      content: SingleChildScrollView(
+        child: ListBody(
+          children: contacts.map((contact) {
+            return ListTile(
+              title: Text(contact.displayName), // Use displayName instead of contact.name
+              onTap: () {
+                Navigator.of(context).pop(contact);
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  },
+);
+}
 
   // Handle Google search command
   Future<void> _handleGoogleSearch({
