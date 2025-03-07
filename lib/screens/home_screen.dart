@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../widgets/task_item.dart';
-import '../widgets/action_item.dart';
 import '../widgets/quick_action_button.dart';
 import '../services/search_service.dart';
 import './metrics_screen.dart';
@@ -227,6 +226,20 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const SizedBox(height: 30),
+                // Title Bar
+                const Center(
+                  child: Text(
+                    'My Assistant',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 30),
+
                 // Search Bar with YouTube integration
                 Container(
                   decoration: BoxDecoration(
@@ -268,8 +281,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 30),
-                
+                const SizedBox(height: 40),
+
                 // Current Task Section
                 Text(
                   _taskRunning ? 'Current Task: $_currentTaskTitle' : 'Current Task',
@@ -304,45 +317,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       isCurrent: step['isCurrent'],
                     );
                   }),
-                
-                const SizedBox(height: 30),
-                
-                // Recent Actions Section
-                const Text(
-                  'Recent Actions',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                
-                // Meeting Action
-                ActionItem(
-                  icon: Icons.calendar_today,
-                  color: Colors.blue[100]!,
-                  title: 'Meeting scheduled',
-                  subtitle: 'Tomorrow, 2:00 PM',
-                  actionButton: TextButton(
-                    onPressed: () {},
-                    child: const Text('View', style: TextStyle(color: Colors.black)),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                
-                // Payment Action
-                ActionItem(
-                  icon: Icons.attach_money,
-                  color: Colors.green[100]!,
-                  title: 'Payment sent',
-                  subtitle: 'To: Sarah Wilson',
-                  actionButton: TextButton(
-                    onPressed: () {},
-                    child: const Text('Details', style: TextStyle(color: Colors.black)),
-                  ),
-                ),
-                
-                const SizedBox(height: 30),
+
+                  const SizedBox(height: 30),
                 
                 // Quick Actions Section
                 const Text(
@@ -359,20 +335,28 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     QuickActionButton(
-                      icon: Icons.mic,
+                      icon: Icons.call,
                       color: Colors.purple[100]!,
-                      label: 'Voice', 
-                      onTap: _startListening,
+                      label: 'Call',
+                      onTap: () {
+                        // Implement call feature here
+                      },
                     ),
                     QuickActionButton(
                       icon: Icons.calendar_today,
                       color: Colors.blue[100]!,
-                      label: 'Calendar', onTap: () {  },
+                      label: 'Calendar',
+                      onTap: () {
+                        // Implement calendar feature here
+                      },
                     ),
                     QuickActionButton(
                       icon: Icons.credit_card,
                       color: Colors.green[100]!,
-                      label: 'Payment', onTap: () {  },
+                      label: 'Payment',
+                      onTap: () {
+                        // Implement payment feature here
+                      },
                     ),
                     QuickActionButton(
                       icon: Icons.auto_graph,

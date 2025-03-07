@@ -1,11 +1,13 @@
 import 'package:android_intent_plus/flag.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart'; // For date formatting
 // import 'package:contacts_service/contacts_service.dart'; // For accessing contacts
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 // Callback types for updating UI state
 typedef TaskStartCallback = void Function(String taskTitle, List<String> steps);
@@ -37,6 +39,18 @@ class SearchService {
     'kal meeting hai': 'meeting tomorrow',
     'aaj ka plan batao': 'show plan for today',
   };
+
+  final FlutterTts _flutterTts = FlutterTts();
+
+  // Future<void> _initTts() async {
+  //   await _flutterTts.setLanguage("en-US"); // Set language
+  //   await _flutterTts.setSpeechRate(0.5); // Set speech rate (optional)
+  // }
+
+  // Provide voice feedback
+  Future<void> _speak(String text) async {
+    await _flutterTts.speak(text);
+  }
 
   static final RegExp _callPattern = RegExp(
     r'^call\s+(.+)$',
@@ -377,7 +391,7 @@ class SearchService {
     }
   }
 
-  Future<void> _handleCall({
+ Future<void> _handleCall({
   required String name,
   required TaskStartCallback onTaskStart,
   required TaskProgressCallback onTaskProgress,
@@ -425,11 +439,18 @@ class SearchService {
     return;
   }
 
-  // Prompt user to select a contact
-  final selectedContact = await _showContactSelectionDialog(
-    context: context,
-    contacts: matchingContacts,
-  );
+  Contact? selectedContact;
+
+  // If only one matching contact is found, skip the selection dialog
+  if (matchingContacts.length == 1) {
+    selectedContact = matchingContacts.first;
+  } else {
+    // Prompt user to select a contact if multiple matches are found
+    selectedContact = await _showContactSelectionDialog(
+      context: context,
+      contacts: matchingContacts,
+    );
+  }
 
   if (selectedContact == null) {
     onError("No contact selected");
@@ -477,6 +498,21 @@ class SearchService {
     return;
   }
 
+  var status = await Permission.phone.status;
+  if (!status.isGranted) {
+    status = await Permission.phone.request();
+    if (!status.isGranted) {
+      onError("Permission denied to make phone calls");
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Permission denied to make phone calls')),
+        );
+      }
+      return;
+    }
+  }
+
   // Initiate the call directly
   try {
     final intent = AndroidIntent(
@@ -486,6 +522,9 @@ class SearchService {
     );
     await intent.launch();
     onTaskProgress(3);
+
+    // Provide voice feedback
+    await _speak("Calling ${selectedContact.displayName}");
   } catch (e) {
     onError("Could not initiate call: $e");
 
@@ -496,11 +535,6 @@ class SearchService {
     }
   }
 }
-  // // Request CALL_PHONE permission
-  // Future<bool> _requestCallPermission(BuildContext context) async {
-  //   final status = await Permission.phone.request();
-  //   return status.isGranted;
-  // }
 
 // Show a dialog to confirm the call
    Future<bool> _showCallConfirmationDialog({
@@ -696,11 +730,15 @@ try {
       await intent.launch();
 
       onTaskProgress(2);
+
+       // Provide voice feedback
+    await _speak("Searching on Google");
     } on PlatformException {
       final Uri webUri = Uri.parse('https://www.google.com/search?q=${Uri.encodeComponent(searchQuery)}');
       try {
         await launchUrl(webUri, mode: LaunchMode.externalApplication);
         onTaskProgress(2);
+        await _speak("Searching on Google");
       } catch (e) {
         onError("Could not launch Google: $e");
 
@@ -742,11 +780,15 @@ try {
       await intent.launch();
 
       onTaskProgress(2);
+
+      await _speak("Searching on YouTube");
     } on PlatformException {
       final Uri webUri = Uri.parse('https://www.youtube.com/results?search_query=${Uri.encodeComponent(searchQuery)}');
       try {
         await launchUrl(webUri, mode: LaunchMode.externalApplication);
         onTaskProgress(2);
+
+        await _speak("Searching on YouTube");
       } catch (e) {
         onError("Could not launch YouTube: $e");
 
@@ -761,43 +803,49 @@ try {
 
   // Handle command to just open YouTube
   Future<void> _handleYoutubeOpen({
-    required TaskStartCallback onTaskStart,
-    required TaskProgressCallback onTaskProgress,
-    required ErrorCallback onError,
-    required BuildContext context,
-  }) async {
-    onTaskStart("Opening YouTube", [
-      "Processing your request",
-      "Launching YouTube app",
-    ]);
+  required TaskStartCallback onTaskStart,
+  required TaskProgressCallback onTaskProgress,
+  required ErrorCallback onError,
+  required BuildContext context,
+}) async {
+  onTaskStart("Opening YouTube", [
+    "Processing your request",
+    "Launching YouTube app",
+  ]);
 
-    onTaskProgress(0);
+  onTaskProgress(0);
 
+  try {
+    final intent = AndroidIntent(
+      action: 'android.intent.action.VIEW',
+      package: 'com.google.android.youtube',
+      data: 'https://www.youtube.com/',
+    );
+    await intent.launch();
+
+    onTaskProgress(1);
+
+    // Provide voice feedback
+    await _speak("Opening YouTube");
+  } on PlatformException {
+    final Uri webUri = Uri.parse('https://www.youtube.com/');
     try {
-      final intent = AndroidIntent(
-        action: 'android.intent.action.VIEW',
-        package: 'com.google.android.youtube',
-        data: 'https://www.youtube.com/',
-      );
-      await intent.launch();
-
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
       onTaskProgress(1);
-    } on PlatformException {
-      final Uri webUri = Uri.parse('https://www.youtube.com/');
-      try {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
-        onTaskProgress(1);
-      } catch (e) {
-        onError("Could not launch YouTube: $e");
 
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not launch YouTube: $e')),
-          );
-        }
+      // Provide voice feedback
+      await _speak("Opening YouTube");
+    } catch (e) {
+      onError("Could not launch YouTube: $e");
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not launch YouTube: $e')),
+        );
       }
     }
   }
+}
 
   // Handle command to open calendar
   Future<void> _handleCalendarOpen({
@@ -821,11 +869,15 @@ try {
       await intent.launch();
 
       onTaskProgress(1);
+
+      await _speak("Opening Calendar");
     } on PlatformException {
       try {
         final calendarUri = Uri.parse('content://com.android.calendar/time/');
         await launchUrl(calendarUri);
         onTaskProgress(1);
+
+        await _speak("Opening Calendar");
       } catch (e) {
         onError("Could not open Calendar: $e");
 
@@ -840,70 +892,73 @@ try {
 
   // Handle command to add calendar event
   Future<void> _handleAddCalendarEvent({
-    required String eventDescription,
-    required TaskStartCallback onTaskStart,
-    required TaskProgressCallback onTaskProgress,
-    required ErrorCallback onError,
-    required BuildContext context,
-  }) async {
-    if (eventDescription.isEmpty) {
-      onError("Event description is required");
-      return;
-    }
+  required String eventDescription,
+  required TaskStartCallback onTaskStart,
+  required TaskProgressCallback onTaskProgress,
+  required ErrorCallback onError,
+  required BuildContext context,
+}) async {
+  if (eventDescription.isEmpty) {
+    onError("Event description is required");
+    return;
+  }
 
-    onTaskStart("Creating Calendar Event", [
-      "Processing your request",
-      "Extracting event details",
-      "Adding to calendar",
-    ]);
+  onTaskStart("Creating Calendar Event", [
+    "Processing your request",
+    "Extracting event details",
+    "Adding to calendar",
+  ]);
 
-    onTaskProgress(0);
+  onTaskProgress(0);
 
-    final eventDetails = _extractEventDetails(eventDescription);
-    final String title = eventDetails['title'];
-    final DateTime dateTime = eventDetails['dateTime'];
-    final String location = eventDetails['location'];
+  final eventDetails = _extractEventDetails(eventDescription);
+  final String title = eventDetails['title'];
+  final DateTime dateTime = eventDetails['dateTime'];
+  final String location = eventDetails['location'];
 
-    onTaskProgress(1);
+  onTaskProgress(1);
 
-    final dateFormatter = DateFormat('MMM dd, yyyy');
-    final timeFormatter = DateFormat('h:mm a');
-    final formattedDate = dateFormatter.format(dateTime);
-    final formattedTime = timeFormatter.format(dateTime);
+  final dateFormatter = DateFormat('MMM dd, yyyy');
+  final timeFormatter = DateFormat('h:mm a');
+  final formattedDate = dateFormatter.format(dateTime);
+  final formattedTime = timeFormatter.format(dateTime);
 
-    try {
-      final endTime = dateTime.add(const Duration(hours: 1));
+  try {
+    final endTime = dateTime.add(const Duration(hours: 1));
 
-      final intent = AndroidIntent(
-        action: 'android.intent.action.INSERT',
-        data: 'content://com.android.calendar/events',
-        arguments: <String, dynamic>{
-          'title': title,
-          'beginTime': dateTime.millisecondsSinceEpoch,
-          'endTime': endTime.millisecondsSinceEpoch,
-          'eventLocation': location,
-          'description': 'Created via voice command: "$eventDescription"',
-        },
+    final intent = AndroidIntent(
+      action: 'android.intent.action.INSERT',
+      data: 'content://com.android.calendar/events',
+      arguments: <String, dynamic>{
+        'title': title,
+        'beginTime': dateTime.millisecondsSinceEpoch,
+        'endTime': endTime.millisecondsSinceEpoch,
+        'eventLocation': location,
+        'description': 'Created via voice command: "$eventDescription"',
+      },
+    );
+    await intent.launch();
+
+    onTaskProgress(2);
+
+    // Provide voice feedback
+    await _speak("Event '$title' scheduled for $formattedDate at $formattedTime");
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Event "$title" scheduled for $formattedDate at $formattedTime')),
       );
-      await intent.launch();
+    }
+  } catch (e) {
+    onError("Could not create calendar event: $e");
 
-      onTaskProgress(2);
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Event "$title" scheduled for $formattedDate at $formattedTime')),
-        );
-      }
-    } catch (e) {
-      onError("Could not create calendar event: $e");
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not create calendar event: $e')),
-        );
-      }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create calendar event: $e')),
+      );
     }
   }
+}
 
   // Handle command to view calendar for a specific date
   Future<void> _handleViewCalendarDate({
@@ -1046,6 +1101,8 @@ try {
       await intent.launch();
 
       onTaskProgress(1);
+
+      await _speak("Opening Gmail");
     } on PlatformException catch (e) {
       onError("Could not open Gmail: $e");
 
@@ -1078,6 +1135,8 @@ try {
       await intent.launch();
 
       onTaskProgress(1);
+
+      await _speak("Opening Settings");
     } on PlatformException catch (e) {
       onError("Could not open Settings: $e");
 
@@ -1110,6 +1169,8 @@ try {
       await intent.launch();
 
       onTaskProgress(1);
+
+      await _speak("Opening Camera");
     } on PlatformException catch (e) {
       onError("Could not open Camera: $e");
 
@@ -1143,6 +1204,8 @@ try {
       await intent.launch();
 
       onTaskProgress(1);
+
+      await _speak("Opening Photos");
     } on PlatformException catch (e) {
       onError("Could not open Gallery: $e");
 

@@ -5,6 +5,8 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   battery_plus
   connectivity_plus
+  flutter_tts
+  permission_handler_windows
   url_launcher_windows
 )
 
