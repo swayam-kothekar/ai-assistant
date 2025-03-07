@@ -1,3 +1,4 @@
+import 'package:android_intent_plus/flag.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:android_intent_plus/android_intent.dart';
@@ -36,6 +37,11 @@ class SearchService {
     'kal meeting hai': 'meeting tomorrow',
     'aaj ka plan batao': 'show plan for today',
   };
+
+  static final RegExp _callPattern = RegExp(
+    r'^call\s+(.+)$',
+    caseSensitive: false,
+  );
 
   static final RegExp _paymentPattern = RegExp(
   r'^pay\s+(?:rs|rupees?)?\s*(\d+)\s+(?:rs|rupees?)?\s+to\s+(.+)$',
@@ -235,6 +241,9 @@ class SearchService {
     final translatedText = _translateHinglishToEnglish(searchText);
     final trimmedText = translatedText.trim();
 
+    // Check if text matches call pattern
+    final callMatch = _callPattern.firstMatch(trimmedText);
+
     // Check if text matches payment pattern
     final paymentMatch = _paymentPattern.firstMatch(trimmedText);
 
@@ -257,7 +266,16 @@ class SearchService {
     final isCameraOpen = _cameraOpenPattern.hasMatch(trimmedText);
     final isGalleryOpen = _galleryOpenPattern.hasMatch(trimmedText);
 
-    if (paymentMatch != null) {
+    if (callMatch != null) {
+      final name = callMatch.group(1)?.trim() ?? '';
+      await _handleCall(
+        name: name,
+        onTaskStart: onTaskStart,
+        onTaskProgress: onTaskProgress,
+        onError: onError,
+        context: context,
+      );
+    } else if (paymentMatch != null) {
       final amount = paymentMatch.group(1);
       final name = paymentMatch.group(2)?.trim() ?? '';
       await _handlePayment(
@@ -358,6 +376,161 @@ class SearchService {
       );
     }
   }
+
+  Future<void> _handleCall({
+  required String name,
+  required TaskStartCallback onTaskStart,
+  required TaskProgressCallback onTaskProgress,
+  required ErrorCallback onError,
+  required BuildContext context,
+}) async {
+  onTaskStart("Processing Call", [
+    "Finding contacts matching: $name",
+    "Selecting contact",
+    "Initiating call",
+  ]);
+
+  onTaskProgress(0);
+
+  // Request contact permissions
+  if (!await FlutterContacts.requestPermission()) {
+    onError("Permission denied to access contacts");
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Permission denied to access contacts')),
+      );
+    }
+    return;
+  }
+
+  // Fetch all contacts
+  final contacts = await FlutterContacts.getContacts(withProperties: true);
+
+  // Filter contacts by name
+  final matchingContacts = contacts.where((contact) {
+    return contact.displayName.toLowerCase().contains(name.toLowerCase());
+  }).toList();
+
+  onTaskProgress(1);
+
+  if (matchingContacts.isEmpty) {
+    onError("No contacts found matching: $name");
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No contacts found matching: $name')),
+      );
+    }
+    return;
+  }
+
+  // Prompt user to select a contact
+  final selectedContact = await _showContactSelectionDialog(
+    context: context,
+    contacts: matchingContacts,
+  );
+
+  if (selectedContact == null) {
+    onError("No contact selected");
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No contact selected')),
+      );
+    }
+    return;
+  }
+
+  onTaskProgress(2);
+
+  // Confirm the call
+  final shouldCall = await _showCallConfirmationDialog(
+    context: context,
+    contactName: selectedContact.displayName,
+  );
+
+  if (!shouldCall) {
+    onError("Call cancelled");
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Call cancelled')),
+      );
+    }
+    return;
+  }
+
+  // Get the phone number from the selected contact
+  final phoneNumber = selectedContact.phones.isNotEmpty
+      ? selectedContact.phones.first.number
+      : '';
+
+  if (phoneNumber.isEmpty) {
+    onError("No phone number found for selected contact");
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No phone number found for selected contact')),
+      );
+    }
+    return;
+  }
+
+  // Initiate the call directly
+  try {
+    final intent = AndroidIntent(
+      action: 'android.intent.action.CALL',
+      data: 'tel:$phoneNumber',
+      flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
+    );
+    await intent.launch();
+    onTaskProgress(3);
+  } catch (e) {
+    onError("Could not initiate call: $e");
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not initiate call: $e')),
+      );
+    }
+  }
+}
+  // // Request CALL_PHONE permission
+  // Future<bool> _requestCallPermission(BuildContext context) async {
+  //   final status = await Permission.phone.request();
+  //   return status.isGranted;
+  // }
+
+// Show a dialog to confirm the call
+   Future<bool> _showCallConfirmationDialog({
+  required BuildContext context,
+  required String contactName,
+}) async {
+  return await showDialog<bool>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text('Confirm Call'),
+        content: Text('Do you want to call $contactName?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(false); // Cancel
+            },
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(true); // Confirm
+            },
+            child: Text('Call'),
+          ),
+        ],
+      );
+    },
+  ) ?? false; // Default to false if the dialog is dismissed
+}
 
   // Handle payment command
   Future<void> _handlePayment({
