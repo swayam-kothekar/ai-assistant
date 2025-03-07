@@ -37,6 +37,8 @@ dependencies:
   # disk_space_plus: ^0.2.2
   connectivity_plus: ^4.0.0
   system_resources: ^1.6.0
+  package_info_plus: ^8.3.0 
+  speech_to_text: ^7.0.0
   
 
   # The following adds the Cupertino Icons font to your application.

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../widgets/task_item.dart';
 import '../widgets/action_item.dart';
 import '../widgets/quick_action_button.dart';
 import '../services/search_service.dart';
-import './metrics_screen.dart'; // Import the new metrics screen
+import './metrics_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,6 +17,11 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   bool _isSearching = false;
+  bool _isListening = false;
+
+  // Speech to text instance
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _speechEnabled = false;
 
   // Search service instance
   final SearchService _searchService = SearchService();
@@ -31,6 +37,66 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchFocusNode.addListener(_onFocusChanged);
     // Initialize with "no tasks" message
     _setNoTasksMessage();
+    // Initialize speech recognition
+    _initSpeech();
+  }
+
+  // Initialize speech recognition
+  Future<void> _initSpeech() async {
+    _speechEnabled = await _speech.initialize(
+      onStatus: (status) {
+        // Update UI when speech status changes
+        if (status == 'notListening') {
+          setState(() {
+            _isListening = false;
+          });
+        }
+      },
+      onError: (errorNotification) {
+        // Handle errors
+        setState(() {
+          _isListening = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Speech recognition error: ${errorNotification.errorMsg}')),
+        );
+      },
+    );
+    setState(() {});
+  }
+
+  // Start listening for speech
+  void _startListening() async {
+    if (!_speechEnabled) {
+      await _initSpeech();
+    }
+
+    setState(() {
+      _isListening = true;
+    });
+
+    await _speech.listen(
+      onResult: (result) {
+        setState(() {
+          _searchController.text = result.recognizedWords;
+          if (result.finalResult) {
+            _isListening = false;
+            // If we have a final result, automatically send the search
+            if (_searchController.text.isNotEmpty) {
+              _sendSearch();
+            }
+          }
+        });
+      },
+    );
+  }
+
+  // Stop listening for speech
+  void _stopListening() async {
+    await _speech.stop();
+    setState(() {
+      _isListening = false;
+    });
   }
 
   @override
@@ -137,19 +203,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Navigate to metrics screen
   void _navigateToMetrics() {
-  try {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const MetricsScreen()),
-    );
-  } catch (e) {
-    // print('Navigation error: $e');
-    // Show an error message to the user if needed
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error navigating to metrics: $e')),
-    );
+    try {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const MetricsScreen()),
+      );
+    } catch (e) {
+      // Show an error message to the user if needed
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error navigating to metrics: $e')),
+      );
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -179,8 +244,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           controller: _searchController,
                           focusNode: _searchFocusNode,
                           decoration: InputDecoration(
-                            hintText: 'How can I help you today?',
-                            hintStyle: TextStyle(color: Colors.grey[600], fontSize: 16),
+                            hintText: _isListening 
+                                ? 'Listening...' 
+                                : 'How can I help you today?',
+                            hintStyle: TextStyle(
+                              color: _isListening ? Colors.blue : Colors.grey[600], 
+                              fontSize: 16
+                            ),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.zero,
                           ),
@@ -291,7 +361,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     QuickActionButton(
                       icon: Icons.mic,
                       color: Colors.purple[100]!,
-                      label: 'Voice', onTap: () {  },
+                      label: 'Voice', 
+                      onTap: _startListening,
                     ),
                     QuickActionButton(
                       icon: Icons.calendar_today,
@@ -307,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.auto_graph,
                       color: Colors.red[100]!,
                       label: 'Metrics',
-                      onTap: _navigateToMetrics, // Add navigation to metrics screen
+                      onTap: _navigateToMetrics,
                     ),
                   ],
                 ),
@@ -319,11 +390,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: Colors.black,
-        child: const Icon(Icons.mic, color: Colors.white),
+        onPressed: _isListening ? _stopListening : _startListening,
+        backgroundColor: _isListening ? Colors.red : Colors.black,
+        child: Icon(
+          _isListening ? Icons.stop : Icons.mic, 
+          color: Colors.white
+        ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }
