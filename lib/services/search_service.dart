@@ -10,6 +10,38 @@ typedef TaskProgressCallback = void Function(int completedStepIndex);
 typedef ErrorCallback = void Function(String message);
 
 class SearchService {
+  // Translation map for Hinglish to English
+  static final Map<String, String> _hinglishToEnglishMap = {
+    'kal ka plan batao': 'show plan for tomorrow',
+    'aaj kya hai': 'what is today',
+    'google par search karo': 'search on google for',
+    'google per search karo': 'search on google for',
+    'youtube kholo aur search karo': 'open youtube and search',
+    'youtube kholo': 'open youtube',
+    'calendar dikhao': 'open calendar',
+    'event add karo': 'add event',
+    'maps kholo': 'open maps',
+    'gmail kholo': 'open gmail',
+    'settings kholo': 'open settings',
+    'camera kholo': 'open camera',
+    'photos dikhao': 'open gallery',
+    'time kya hua hai': 'what is the time',
+    'date kya hai': 'what is the date',
+    'meeting schedule karo': 'schedule meeting',
+    'location dikhao': 'show location',
+    'kal meeting hai': 'meeting tomorrow',
+    'aaj ka plan batao': 'show plan for today',
+  };
+
+  // Method to translate Hinglish to English
+  String _translateHinglishToEnglish(String input) {
+    String translatedText = input.toLowerCase();
+    _hinglishToEnglishMap.forEach((hinglish, english) {
+      translatedText = translatedText.replaceAll(hinglish, english);
+    });
+    return translatedText.trim();
+  }
+
   // Regular expressions for detecting YouTube commands
   static final RegExp _youtubeSearchPattern = RegExp(
     r'^(?:open\s+youtube\s+and\s+search|search\s+(?:on|in)\s+youtube\s+for|youtube\s+search)(?:\s+for)?\s+(.+)$',
@@ -18,6 +50,12 @@ class SearchService {
 
   static final RegExp _youtubeOpenPattern = RegExp(
     r'^open\s+youtube$',
+    caseSensitive: false,
+  );
+
+  // Regular expression for detecting Google search commands
+  static final RegExp _googleSearchPattern = RegExp(
+    r'^(?:search\s+(?:on|in)\s+google\s+for|google\s+search)(?:\s+for)?\s+(.+)$',
     caseSensitive: false,
   );
 
@@ -184,7 +222,12 @@ class SearchService {
     required ErrorCallback onError,
     required BuildContext context,
   }) async {
-    final trimmedText = searchText.trim();
+    // Translate Hinglish to English
+    final translatedText = _translateHinglishToEnglish(searchText);
+    final trimmedText = translatedText.trim();
+
+    // Check if text matches Google search pattern
+    final googleSearchMatch = _googleSearchPattern.firstMatch(trimmedText);
 
     // Check if text matches YouTube patterns
     final youtubeSearchMatch = _youtubeSearchPattern.firstMatch(trimmedText);
@@ -202,7 +245,15 @@ class SearchService {
     final isCameraOpen = _cameraOpenPattern.hasMatch(trimmedText);
     final isGalleryOpen = _galleryOpenPattern.hasMatch(trimmedText);
 
-    if (youtubeSearchMatch != null) {
+    if (googleSearchMatch != null) {
+      await _handleGoogleSearch(
+        searchQuery: googleSearchMatch.group(1)?.trim() ?? '',
+        onTaskStart: onTaskStart,
+        onTaskProgress: onTaskProgress,
+        onError: onError,
+        context: context,
+      );
+    } else if (youtubeSearchMatch != null) {
       await _handleYoutubeSearch(
         searchQuery: youtubeSearchMatch.group(1)?.trim() ?? '',
         onTaskStart: onTaskStart,
@@ -282,6 +333,52 @@ class SearchService {
         onTaskProgress: onTaskProgress,
         context: context,
       );
+    }
+  }
+
+  // Handle Google search command
+  Future<void> _handleGoogleSearch({
+    required String searchQuery,
+    required TaskStartCallback onTaskStart,
+    required TaskProgressCallback onTaskProgress,
+    required ErrorCallback onError,
+    required BuildContext context,
+  }) async {
+    if (searchQuery.isEmpty) return;
+
+    onTaskStart("Searching Google", [
+      "Processing your request",
+      "Connecting to Google",
+      "Searching for: $searchQuery",
+    ]);
+
+    onTaskProgress(0);
+
+    try {
+      onTaskProgress(1);
+
+      final intent = AndroidIntent(
+        action: 'android.intent.action.VIEW',
+        package: 'com.android.chrome', // You can use any browser package name
+        data: 'https://www.google.com/search?q=${Uri.encodeComponent(searchQuery)}',
+      );
+      await intent.launch();
+
+      onTaskProgress(2);
+    } on PlatformException {
+      final Uri webUri = Uri.parse('https://www.google.com/search?q=${Uri.encodeComponent(searchQuery)}');
+      try {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        onTaskProgress(2);
+      } catch (e) {
+        onError("Could not launch Google: $e");
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not launch Google: $e')),
+          );
+        }
+      }
     }
   }
 
