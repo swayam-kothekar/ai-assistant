@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:android_intent_plus/android_intent.dart';
-import 'package:flutter/services.dart';
 import '../widgets/task_item.dart';
 import '../widgets/action_item.dart';
 import '../widgets/quick_action_button.dart';
+import '../services/search_service.dart'; // Import the new service
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,11 +16,20 @@ class _HomeScreenState extends State<HomeScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   bool _isSearching = false;
 
+  // Search service instance
+  final SearchService _searchService = SearchService();
+
+  List<Map<String, dynamic>> _taskSteps = [];
+  bool _taskRunning = false;
+  String _currentTaskTitle = "";
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     _searchFocusNode.addListener(_onFocusChanged);
+    // Initialize with "no tasks" message
+    _setNoTasksMessage();
   }
 
   @override
@@ -30,6 +37,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _setNoTasksMessage() {
+    setState(() {
+      _taskSteps = [];
+      _taskRunning = false;
+      _currentTaskTitle = "No tasks currently running";
+    });
   }
 
   void _onSearchChanged() {
@@ -44,98 +59,80 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-
-Future<void> _sendSearch() async {
-  final searchText = _searchController.text.trim();
-  
-  // Regex patterns to detect YouTube commands
-  final RegExp youtubeSearchPattern = RegExp(
-    r'^(?:open\s+youtube\s+and\s+search|search\s+(?:on|in)\s+youtube\s+for|youtube\s+search)(?:\s+for)?\s+(.+)$',
-    caseSensitive: false
-  );
-  
-  final RegExp youtubeOpenPattern = RegExp(
-    r'^open\s+youtube$',
-    caseSensitive: false
-  );
-  
-  // Check if text matches YouTube search pattern
-  final youtubeSearchMatch = youtubeSearchPattern.firstMatch(searchText);
-  final isYoutubeOpen = youtubeOpenPattern.hasMatch(searchText);
-  
-  if (youtubeSearchMatch != null) {
-    // Extract the search query from the command
-    final searchQuery = youtubeSearchMatch.group(1)?.trim() ?? '';
+  void _startTask(String taskTitle, List<String> steps) {
+    List<Map<String, dynamic>> newTaskSteps = [];
     
-    if (searchQuery.isNotEmpty) {
-      try {
-        // Use AndroidIntent to launch YouTube with search
-        final intent = AndroidIntent(
-          action: 'android.intent.action.VIEW',
-          package: 'com.google.android.youtube',
-          data: 'https://www.youtube.com/results?search_query=${Uri.encodeComponent(searchQuery)}',
-        );
-        await intent.launch();
-        
-        // Show confirmation
-        // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Searching YouTube for: $searchQuery')),
-        );
-      } on PlatformException {
-        // Fall back to web if the app isn't installed
-        final Uri webUri = Uri.parse('https://www.youtube.com/results?search_query=${Uri.encodeComponent(searchQuery)}');
-        try {
-          await launchUrl(webUri, mode: LaunchMode.externalApplication);
-        } catch (e) {
-          // ignore: use_build_context_synchronously
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not launch YouTube: $e')),
-          );
+    // Create task steps with initial states
+    for (int i = 0; i < steps.length; i++) {
+      newTaskSteps.add({
+        'text': steps[i],
+        'isCompleted': false,
+        'isCurrent': i == 0, // First step is current
+      });
+    }
+    
+    setState(() {
+      _taskSteps = newTaskSteps;
+      _taskRunning = true;
+      _currentTaskTitle = taskTitle;
+    });
+  }
+
+  void _updateTaskProgress(int completedStepIndex) {
+    if (!_taskRunning || _taskSteps.isEmpty) return;
+    
+    setState(() {
+      // Mark the completed step
+      if (completedStepIndex < _taskSteps.length) {
+        _taskSteps[completedStepIndex]['isCompleted'] = true;
+        _taskSteps[completedStepIndex]['isCurrent'] = false;
+      }
+      
+      // Set the next step as current
+      if (completedStepIndex + 1 < _taskSteps.length) {
+        _taskSteps[completedStepIndex + 1]['isCurrent'] = true;
+      } else {
+        // All steps completed
+        Future.delayed(const Duration(seconds: 3), () {
+          _setNoTasksMessage();
+        });
+      }
+    });
+  }
+
+  void _handleSearchError(String errorMessage) {
+    // Update task to show error
+    setState(() {
+      // Find the current step and update it with error
+      for (int i = 0; i < _taskSteps.length; i++) {
+        if (_taskSteps[i]['isCurrent']) {
+          _taskSteps[i]['text'] = "Error: $errorMessage";
+          _taskSteps[i]['isCurrent'] = false;
+          _taskSteps[i]['isCompleted'] = true;
+          break;
         }
       }
-    }
-  } else if (isYoutubeOpen) {
-    // Just open YouTube homepage
-    try {
-      final intent = AndroidIntent(
-        action: 'android.intent.action.VIEW',
-        package: 'com.google.android.youtube',
-        data: 'https://www.youtube.com/',
-      );
-      await intent.launch();
-      
-      // Show confirmation
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Opening YouTube')),
-      );
-    } on PlatformException {
-      // Fall back to web if the app isn't installed
-      final Uri webUri = Uri.parse('https://www.youtube.com/');
-      try {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
-      } catch (e) {
-        // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not launch YouTube: $e')),
-        );
-      }
-    }
-  } else {
-    // Not a YouTube command - handle differently or show message
-    // ignore: use_build_context_synchronously
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('I understand: "$searchText" (not a YouTube command)')),
+    });
+  }
+
+  Future<void> _sendSearch() async {
+    final searchText = _searchController.text.trim();
+    
+    if (searchText.isEmpty) return;
+    
+    // Use the search service to process the input
+    await _searchService.processSearch(
+      searchText: searchText,
+      onTaskStart: _startTask,
+      onTaskProgress: _updateTaskProgress,
+      onError: _handleSearchError,
+      context: context,
     );
     
-    // Here you would add your NLP processing in the future
+    // Clear the search field and unfocus to hide keyboard
+    _searchController.clear();
+    _searchFocusNode.unfocus();
   }
-  
-  // Clear the search field and unfocus to hide keyboard
-  _searchController.clear();
-  _searchFocusNode.unfocus();
-}
 
   @override
   Widget build(BuildContext context) {
@@ -187,9 +184,9 @@ Future<void> _sendSearch() async {
                 const SizedBox(height: 30),
                 
                 // Current Task Section
-                const Text(
-                  'Current Task',
-                  style: TextStyle(
+                Text(
+                  _taskRunning ? 'Current Task: $_currentTaskTitle' : 'Current Task',
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -197,24 +194,29 @@ Future<void> _sendSearch() async {
                 const SizedBox(height: 15),
                 
                 // Task Steps
-                const TaskItem(
-                  icon: Icons.assignment_turned_in,
-                  text: 'Analyzing expense patterns',
-                  isCompleted: true,
-                  isCurrent: false,
-                ),
-                const TaskItem(
-                  icon: Icons.lightbulb_outline,
-                  text: 'Generating insights',
-                  isCompleted: false,
-                  isCurrent: true,
-                ),
-                const TaskItem(
-                  icon: Icons.recommend,
-                  text: 'Preparing recommendations',
-                  isCompleted: false,
-                  isCurrent: false,
-                ),
+                if (_taskSteps.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 15),
+                    child: Text(
+                      'No tasks currently running',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  )
+                else
+                  ...List.generate(_taskSteps.length, (index) {
+                    final step = _taskSteps[index];
+                    return TaskItem(
+                      icon: step['isCompleted'] 
+                          ? Icons.assignment_turned_in 
+                          : (step['isCurrent'] ? Icons.lightbulb_outline : Icons.recommend),
+                      text: step['text'],
+                      isCompleted: step['isCompleted'],
+                      isCurrent: step['isCurrent'],
+                    );
+                  }),
                 
                 const SizedBox(height: 30),
                 
