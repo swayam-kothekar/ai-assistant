@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../widgets/task_item.dart';
 import '../widgets/action_item.dart';
 import '../widgets/quick_action_button.dart';
-import '../services/search_service.dart'; // Import the new service
+import '../services/search_service.dart';
+import './metrics_screen.dart'; // Import the new metrics screen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -133,6 +134,22 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.clear();
     _searchFocusNode.unfocus();
   }
+
+  // Navigate to metrics screen
+  void _navigateToMetrics() {
+  try {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const MetricsScreen()),
+    );
+  } catch (e) {
+    // print('Navigation error: $e');
+    // Show an error message to the user if needed
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error navigating to metrics: $e')),
+    );
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -274,22 +291,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     QuickActionButton(
                       icon: Icons.mic,
                       color: Colors.purple[100]!,
-                      label: 'Voice',
+                      label: 'Voice', onTap: () {  },
                     ),
                     QuickActionButton(
                       icon: Icons.calendar_today,
                       color: Colors.blue[100]!,
-                      label: 'Calendar',
+                      label: 'Calendar', onTap: () {  },
                     ),
                     QuickActionButton(
                       icon: Icons.credit_card,
                       color: Colors.green[100]!,
-                      label: 'Payment',
+                      label: 'Payment', onTap: () {  },
                     ),
                     QuickActionButton(
-                      icon: Icons.pie_chart,
-                      color: Colors.orange[100]!,
-                      label: 'Analytics',
+                      icon: Icons.auto_graph,
+                      color: Colors.red[100]!,
+                      label: 'Metrics',
+                      onTap: _navigateToMetrics, // Add navigation to metrics screen
                     ),
                   ],
                 ),
