@@ -46,6 +46,7 @@ dependencies:
   flutter_contacts: ^1.1.9+2
   permission_handler: ^11.0.0
   flutter_tts: ^3.6.3
+  mobile_scanner: ^6.0.7
 
 dev_dependencies:
   flutter_test:

@@ -1,3 +1,4 @@
+import 'package:ai_assistant/screens/qr_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../widgets/task_item.dart';
@@ -38,6 +39,26 @@ class _HomeScreenState extends State<HomeScreen> {
     _setNoTasksMessage();
     // Initialize speech recognition
     _initSpeech();
+  }
+
+  void _openQRScannerForPayment() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QRCodeScannerScreen(
+          onScanComplete: (String qrData) {
+            // Use the existing search service to process payment
+            _searchService.processSearch(
+              searchText: "pay using qr: $qrData", // Format the command for SearchService
+              onTaskStart: _startTask,
+              onTaskProgress: _updateTaskProgress,
+              onError: _handleSearchError,
+              context: context,
+            );
+          },
+        ),
+      ),
+    );
   }
 
   // Initialize speech recognition
@@ -217,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -351,12 +372,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                     ),
                     QuickActionButton(
-                      icon: Icons.credit_card,
+                      icon: Icons.qr_code_scanner,
                       color: Colors.green[100]!,
-                      label: 'Payment',
-                      onTap: () {
-                        // Implement payment feature here
-                      },
+                      label: 'Scan QR',
+                      onTap: _openQRScannerForPayment,
                     ),
                     QuickActionButton(
                       icon: Icons.auto_graph,

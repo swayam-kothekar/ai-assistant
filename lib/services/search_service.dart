@@ -1,3 +1,4 @@
+import 'package:ai_assistant/screens/qr_screen.dart';
 import 'package:android_intent_plus/flag.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -291,10 +292,10 @@ class SearchService {
       );
     } else if (paymentMatch != null) {
       final amount = paymentMatch.group(1);
-      final name = paymentMatch.group(2)?.trim() ?? '';
+      // final name = paymentMatch.group(2)?.trim() ?? '';
       await _handlePayment(
         amount: amount ?? '',
-        name: name,
+        // name: name,
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
@@ -569,109 +570,80 @@ class SearchService {
   // Handle payment command
   Future<void> _handlePayment({
   required String amount,
-  required String name,
   required TaskStartCallback onTaskStart,
   required TaskProgressCallback onTaskProgress,
   required ErrorCallback onError,
   required BuildContext context,
 }) async {
   onTaskStart("Processing Payment", [
-    "Finding contacts matching: $name",
-    "Selecting contact",
+    "Scanning QR code",
+    "Extracting payment details",
     "Initiating payment",
   ]);
 
   onTaskProgress(0);
 
-  // Request contact permissions
-  if (!await FlutterContacts.requestPermission()) {
-    onError("Permission denied to access contacts");
+  // Open the QR code scanner screen
+  final String? qrData = await Navigator.of(context).push<String>(
+    MaterialPageRoute(
+      builder: (context) => QRCodeScannerScreen(
+        onScanComplete: (data) {
+          Navigator.of(context).pop(data); // Return the scanned data
+        },
+      ),
+    ),
+  );
+
+  if (qrData == null || qrData.isEmpty) {
+    onError("No QR code scanned");
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Permission denied to access contacts')),
+        SnackBar(content: Text('No QR code scanned')),
       );
     }
     return;
   }
-
-  // Fetch all contacts
-  final contacts = await FlutterContacts.getContacts(withProperties: true);
-
-// Now you can filter by name
-final matchingContacts = contacts.where((contact) => 
-  contact.displayName.toLowerCase().contains(name.toLowerCase())
-).toList();
 
   onTaskProgress(1);
 
-  if (matchingContacts.isEmpty) {
-    onError("No contacts found matching: $name");
+  // Extract UPI payment details from the QR code
+  final Uri? paymentUri = Uri.tryParse(qrData);
+  if (paymentUri == null || paymentUri.scheme != 'upi') {
+    onError("Invalid UPI QR code");
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No contacts found matching: $name')),
+        SnackBar(content: Text('Invalid UPI QR code')),
       );
     }
     return;
   }
 
-  // Prompt user to select a contact
-  final selectedContact = await _showContactSelectionDialog(
-    context: context,
-    contacts: matchingContacts,
-  );
-
-  if (selectedContact == null) {
-    onError("No contact selected");
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No contact selected')),
-      );
-    }
-    return;
-  }
+  // Add the amount to the payment URI if it's not already present
+  final updatedUri = paymentUri.replace(queryParameters: {
+    ...paymentUri.queryParameters,
+    'am': amount,
+  });
 
   onTaskProgress(2);
 
-  // Get the UPI ID from the selected contact
-  // Initiate UPI payment
-final phoneNumber = selectedContact.phones.isNotEmpty 
-    ? selectedContact.phones.first.number.replaceAll(RegExp(r'[^\d]'), '') 
-    : '';
+  // Initiate the payment
+  try {
+    await launchUrl(updatedUri, mode: LaunchMode.externalApplication);
+    onTaskProgress(3);
 
-// Remove the country code "91" from the beginning if it exists
-final formattedPhone = phoneNumber.startsWith('91') 
-    ? phoneNumber.substring(2) 
-    : phoneNumber;
+    // Provide voice feedback
+    await _speak("Initiating payment of $amount");
+  } catch (e) {
+    onError("Could not initiate payment: $e");
 
-if (formattedPhone.isEmpty) {
-  onError("No phone number found for selected contact");
-
-  if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('No phone number found for selected contact')),
-    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not initiate payment: $e')),
+      );
+    }
   }
-  return;
-}
-
-// Use the formatted phone number in the UPI payment URI
-final paymentUri = Uri.parse('upi://pay?pa=$formattedPhone@upi&am=$amount&cu=INR');
-
-try {
-  await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
-  onTaskProgress(3);
-} catch (e) {
-  onError("Could not initiate payment: $e");
-
-  if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Could not initiate payment: $e')),
-    );
-  }
-}
 }
 
   // Show a dialog to select a contact
