@@ -1,5 +1,5 @@
-import 'package:ai_assistant/services/metrics_service.dart';
 import 'package:flutter/material.dart';
+import 'package:ai_assistant/services/metrics_service.dart';
 
 class MetricsScreen extends StatefulWidget {
   const MetricsScreen({super.key});
@@ -17,6 +17,13 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
   Map<String, dynamic> _deviceInfo = {};
   Map<String, dynamic> _networkStats = {};
   bool _isLoading = true;
+
+  // Define neon colors
+  final Color _neonGreen = Color.fromARGB(110, 11, 245, 139);
+  // final Color _neonPink = Color(0xFFFF10F0);
+  final Color _neonBlue = Color.fromARGB(110, 11, 245, 139);
+  final Color _darkBackground = Color(0xFF121212);
+  final Color _darkSurface = Color(0xFF1E1E1E);
 
   @override
   void initState() {
@@ -36,12 +43,12 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final systemMetrics = await _metricsService.getSystemPerformance();
       final deviceInfo = await _metricsService.getDeviceInfo();
       final networkStats = await _metricsService.getNetworkStats();
-      
+
       setState(() {
         _systemMetrics = systemMetrics;
         _deviceInfo = deviceInfo;
@@ -63,16 +70,34 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _darkBackground,
       appBar: AppBar(
-        title: const Text('System Metrics'),
+        backgroundColor: _darkSurface,
+        title: Text(
+          'System Metrics',
+          style: TextStyle(
+            color: _neonBlue,
+            fontWeight: FontWeight.bold,
+            shadows: [
+              BoxShadow(
+                color: _neonBlue.withOpacity(0.7),
+                blurRadius: 8,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: Icon(Icons.refresh, color: _neonGreen),
             onPressed: _refreshMetrics,
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
+          indicatorColor: _neonGreen,
+          labelColor: _neonGreen,
+          unselectedLabelColor: Colors.grey[400],
           tabs: const [
             Tab(text: 'Overview'),
             Tab(text: 'CPU'),
@@ -82,19 +107,20 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                color: _neonGreen,
+              ),
+            )
           : TabBarView(
               controller: _tabController,
               children: [
                 // Overview Tab
                 _buildOverviewTab(),
-                
                 // CPU Tab
                 _buildCpuTab(),
-                
                 // Memory Tab
                 _buildMemoryTab(),
-                
                 // Network Tab
                 _buildNetworkTab(),
               ],
@@ -106,9 +132,8 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
   Widget _buildOverviewTab() {
     final cpuData = _systemMetrics['cpu'] as Map<String, dynamic>? ?? {};
     final memoryData = _systemMetrics['memory'] as Map<String, dynamic>? ?? {};
-    // final diskData = _systemMetrics['disk'] as Map<String, dynamic>? ?? {};
     final networkData = _systemMetrics['network'] as Map<String, dynamic>? ?? {};
-    
+
     // Get CPU current value and average from history
     final cpuValue = cpuData['usage'] as double? ?? 0.0;
     final cpuHistory = cpuData['history'] as Map<String, dynamic>? ?? {};
@@ -122,99 +147,96 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'System Performance Overview',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
+              color: _neonBlue,
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // CPU Card
           _buildMetricCard(
             'CPU Usage',
             'Current: ${cpuValue.toStringAsFixed(1)}%',
             'Average: ${cpuAverage.toStringAsFixed(1)}%',
             Icons.memory,
-            Colors.blue,
+            _neonBlue,
             cpuValue / 100,
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Memory Card
           _buildMetricCard(
             'Memory Usage',
             'Used: ${memoryData['used']?.toStringAsFixed(1) ?? "0"} GB',
             'Available: ${memoryData['available']?.toStringAsFixed(1) ?? "0"} GB',
             Icons.storage,
-            Colors.green,
+            _neonGreen,
             memoryData['total'] != null && memoryData['total'] > 0
                 ? (memoryData['used'] ?? 0) / (memoryData['total'] ?? 1)
                 : 0,
           ),
-          
+
           const SizedBox(height: 16),
-          
-          // // Disk Card
-          // _buildMetricCard(
-          //   'Disk Usage',
-          //   'Used: ${diskData['used']?.toStringAsFixed(1) ?? "0"} GB',
-          //   'Available: ${diskData['available']?.toStringAsFixed(1) ?? "0"} GB',
-          //   Icons.sd_storage,
-          //   Colors.amber,
-          //   diskData['total'] != null && diskData['total'] > 0
-          //       ? (diskData['used'] ?? 0) / (diskData['total'] ?? 1)
-          //       : 0,
-          // ),
-          
-          const SizedBox(height: 16),
-          
+
           // Network Card
           _buildMetricCard(
             'Network Stats',
             'Download: ${networkData['download']?.toStringAsFixed(1) ?? "0"} Mbps',
             'Upload: ${networkData['upload']?.toStringAsFixed(1) ?? "0"} Mbps',
             Icons.network_check,
-            Colors.purple,
+            _neonGreen,
             0.7, // Fixed progress for network visualization
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // System Health Score
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _neonGreen.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.health_and_safety, size: 50, color: Colors.green),
+                Icon(Icons.health_and_safety, size: 50, color: _neonGreen),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'System Health Score',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
+                          color: _neonGreen,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _calculateHealthScore(cpuValue, memoryData), //diskData
-                        style: const TextStyle(
+                        _calculateHealthScore(cpuValue, memoryData),
+                        style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: Colors.green,
+                          color: _neonGreen,
                         ),
                       ),
-                      Text(_getHealthDescription(cpuValue, memoryData)) //v
+                      Text(
+                        _getHealthDescription(cpuValue, memoryData),
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -226,123 +248,59 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
     );
   }
 
-  // Calculate a health score based on actual metrics
-  String _calculateHealthScore(double cpuUsage, Map<String, dynamic> memoryData) { //Map<String, dynamic> diskData
-    double memoryUsagePercent = memoryData['total'] != null && memoryData['total'] > 0
-        ? (memoryData['used'] ?? 0) / (memoryData['total'] ?? 1) * 100
-        : 50;
-    
-    // double diskUsagePercent = diskData['total'] != null && diskData['total'] > 0
-    //     ? (diskData['used'] ?? 0) / (diskData['total'] ?? 1) * 100
-    //     : 50;
-    
-    // Weight factors: CPU: 40%, Memory: 40%, Disk: 20%
-    double healthScore = 100 - (0.4 * cpuUsage + 0.4 * memoryUsagePercent ); //+ 0.2 * diskUsagePercent
-    return '${healthScore.round()}%';
-  }
-
-  // Get health description based on metrics
-  String _getHealthDescription(double cpuUsage, Map<String, dynamic> memoryData) { //Map<String, dynamic> diskData
-    double memoryUsagePercent = memoryData['total'] != null && memoryData['total'] > 0
-        ? (memoryData['used'] ?? 0) / (memoryData['total'] ?? 1) * 100
-        : 50;
-    
-    if (cpuUsage > 80 || memoryUsagePercent > 80) {
-      return 'System is under heavy load';
-    } else if (cpuUsage > 60 || memoryUsagePercent > 60) {
-      return 'System is running normally';
-    } else {
-      return 'System is running optimally';
-    }
-  }
-
   // Build CPU metrics tab
   Widget _buildCpuTab() {
     final cpuData = _systemMetrics['cpu'] as Map<String, dynamic>? ?? {};
     final cpuUsage = cpuData['usage'] as double? ?? 0.0;
     final cpuCores = cpuData['cores'] as List<dynamic>? ?? [];
-    // final cpuHistory = cpuData['history'] as Map<String, dynamic>? ?? {};
-    
-    // Sort cpu history by key (time)
-    // final sortedHistory = cpuHistory.entries.toList()
-    //   ..sort((a, b) => a.key.compareTo(b.key));
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'CPU Performance',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
+              color: _neonBlue,
             ),
           ),
           const SizedBox(height: 20),
-          
-          // // CPU Usage Graph
-          // Container(
-          //   height: 200,
-          //   padding: const EdgeInsets.all(16),
-          //   decoration: BoxDecoration(
-          //     color: Colors.grey[100],
-          //     borderRadius: BorderRadius.circular(8),
-          //   ),
-          //   child: sortedHistory.isEmpty
-          //       ? const Center(child: Text('No CPU history data available'))
-          //       : Row(
-          //           crossAxisAlignment: CrossAxisAlignment.end,
-          //           children: sortedHistory.map((entry) {
-          //             return Expanded(
-          //               child: Column(
-          //                 mainAxisAlignment: MainAxisAlignment.end,
-          //                 children: [
-          //                   Container(
-          //                     height: ((entry.value as double) / 100) * 150,
-          //                     width: 10,
-          //                     decoration: BoxDecoration(
-          //                       color: _getColorForCpuUsage(entry.value as double),
-          //                       borderRadius: BorderRadius.circular(4),
-          //                     ),
-          //                   ),
-          //                   const SizedBox(height: 5),
-          //                   Text(
-          //                     entry.key.split(':')[0],
-          //                     style: const TextStyle(fontSize: 10),
-          //                     overflow: TextOverflow.ellipsis,
-          //                   ),
-          //                 ],
-          //               ),
-          //             );
-          //           }).toList(),
-          //         ),
-          // ),
-          
-          // const SizedBox(height: 20),
-          
+
           // CPU Core Information
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _neonGreen.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'CPU Core Information',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
+                    color: _neonGreen,
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // CPU cores from actual data
                 if (cpuCores.isEmpty)
-                  const Text('No CPU core data available')
+                  Text(
+                    'No CPU core data available',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                    ),
+                  )
                 else
                   ...List.generate(cpuCores.length, (index) {
                     final coreUsage = cpuCores[index] as double? ?? 0.0;
@@ -350,7 +308,12 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
                       padding: const EdgeInsets.only(bottom: 10),
                       child: Row(
                         children: [
-                          Text('Core ${index + 1}'),
+                          Text(
+                            'Core ${index + 1}',
+                            style: TextStyle(
+                              color: Colors.white,
+                            ),
+                          ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: LinearProgressIndicator(
@@ -362,7 +325,12 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Text('${coreUsage.toStringAsFixed(1)}%'),
+                          Text(
+                            '${coreUsage.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              color: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -370,24 +338,29 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               ],
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // CPU Stats
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _neonGreen.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'CPU Statistics',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
+                    color: _neonGreen,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -395,7 +368,7 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
                 _buildStatRow('CPU Cores', _deviceInfo['cpuCores'] ?? 'Unknown'),
                 _buildStatRow('Current Usage', '${cpuUsage.toStringAsFixed(1)}%'),
                 _buildStatRow('System', _deviceInfo['systemName'] ?? 'Unknown'),
-                _buildStatRow('Temperature', 'Not available'), // Add if you have temperature data
+                _buildStatRow('Temperature', 'Not available'),
               ],
             ),
           ),
@@ -410,82 +383,101 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
     final totalMemory = memoryData['total'] as double? ?? 0.0;
     final usedMemory = memoryData['used'] as double? ?? 0.0;
     final availableMemory = memoryData['available'] as double? ?? 0.0;
-    
+
     final memoryUsedPercent = totalMemory > 0 ? usedMemory / totalMemory : 0.0;
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Memory Usage',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
+              color: _neonBlue,
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Memory Usage Circle
           Center(
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey[200],
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    value: memoryUsedPercent,
-                    backgroundColor: Colors.grey[300],
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      memoryUsedPercent < 0.7 ? Colors.green : 
-                      memoryUsedPercent < 0.9 ? Colors.orange : Colors.red
-                    ),
-                    strokeWidth: 20,
-                  ),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '${(memoryUsedPercent * 100).toStringAsFixed(1)}%',
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Used: ${usedMemory.toStringAsFixed(1)} GB',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ],
+  child: Container(
+    width: 200,
+    height: 200,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: _darkSurface,
+      border: Border.all(
+        color: _neonGreen.withOpacity(0.3),
+        width: 1,
+      ),
+    ),
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        // CircularProgressIndicator (Pie Chart)
+        SizedBox(
+          width: 200, // Match the container size
+          height: 200, // Match the container size
+          child: CircularProgressIndicator(
+            value: memoryUsedPercent,
+            backgroundColor: Colors.grey[300],
+            valueColor: AlwaysStoppedAnimation<Color>(
+              memoryUsedPercent < 0.7 ? _neonGreen : memoryUsedPercent < 0.9 ? Colors.orange : Colors.red,
+            ),
+            strokeWidth: 20, // Adjust stroke width as needed
+          ),
+        ),
+        // Percentage and "Used" Text
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center, // Center the text vertically
+          children: [
+            Text(
+              '${(memoryUsedPercent * 100).toStringAsFixed(1)}%',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: _neonGreen,
               ),
             ),
-          ),
-          
+            const SizedBox(height: 8), // Spacing between percentage and "Used" text
+            Text(
+              'Used: ${usedMemory.toStringAsFixed(1)} GB',
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  ),
+),
           const SizedBox(height: 30),
-          
+
           // Memory Details
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _neonGreen.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Memory Details',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
+                    color: _neonGreen,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -497,32 +489,6 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               ],
             ),
           ),
-          
-          const SizedBox(height: 20),
-          
-          // Memory Consumers
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Memory Information',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                SizedBox(height: 16),
-                Text('Detailed per-process memory usage information is not available.'),
-                Text('This would require additional system-level access.'),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -530,7 +496,6 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
 
   // Build Network metrics tab
   Widget _buildNetworkTab() {
-    // Use actual network data
     final download = _networkStats['download'] as double? ?? 0.0;
     final upload = _networkStats['upload'] as double? ?? 0.0;
     final latency = _networkStats['latency'] as double? ?? 0.0;
@@ -538,44 +503,43 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
     final networkType = _networkStats['type'] as String? ?? 'Unknown';
     final networkName = _networkStats['networkName'] as String? ?? 'Unknown Network';
     final signalStrength = _networkStats['signalStrength'] as String? ?? 'Unknown';
-    
-    // Data usage information
-    final dataUsage = _networkStats['dataUsage'] as Map<String, dynamic>? ?? {};
-    final downloaded = dataUsage['downloaded'] as double? ?? 0.0;
-    final uploaded = dataUsage['uploaded'] as double? ?? 0.0;
-    final sessions = dataUsage['sessions'] as int? ?? 0;
-    final activeTime = dataUsage['activeTime'] as String? ?? '0h 0m';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Network Performance',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
+              color: _neonBlue,
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Download/Upload Graph
           Container(
             height: 200,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _neonGreen.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Current Network Activity',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
+                    color: _neonGreen,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -586,13 +550,13 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
                       _buildNetworkSpeedIndicator(
                         'Download',
                         Icons.arrow_downward,
-                        Colors.green,
+                        _neonGreen,
                         '${download.toStringAsFixed(1)} Mbps',
                       ),
                       _buildNetworkSpeedIndicator(
                         'Upload',
                         Icons.arrow_upward,
-                        Colors.blue,
+                        _neonBlue,
                         '${upload.toStringAsFixed(1)} Mbps',
                       ),
                     ],
@@ -601,24 +565,29 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               ],
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Network Statistics
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _neonGreen.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Network Statistics',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
+                    color: _neonGreen,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -630,88 +599,24 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               ],
             ),
           ),
-          
-          const SizedBox(height: 20),
-          
-          // Data Usage
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Data Usage (Today)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildDataUsageItem(
-                        'Downloaded',
-                        '${downloaded.toStringAsFixed(2)} GB',
-                        Icons.download,
-                        Colors.green,
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildDataUsageItem(
-                        'Uploaded',
-                        '${uploaded.toStringAsFixed(2)} GB',
-                        Icons.upload,
-                        Colors.blue,
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 20),
-                
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildDataUsageItem(
-                        'Sessions',
-                        sessions.toString(),
-                        Icons.compare_arrows,
-                        Colors.purple,
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildDataUsageItem(
-                        'Active Time',
-                        activeTime,
-                        Icons.timer,
-                        Colors.orange,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
   // Helper methods for UI components
-  
+
   // Build a metric card for the overview tab
   Widget _buildMetricCard(String title, String value1, String value2, IconData icon, Color color, double progress) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: _darkSurface,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -722,9 +627,10 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               const SizedBox(width: 8),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
+                  color: color,
                 ),
               ),
             ],
@@ -739,15 +645,25 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(value1),
-              Text(value2),
+              Text(
+                value1,
+                style: TextStyle(
+                  color: Colors.grey[400],
+                ),
+              ),
+              Text(
+                value2,
+                style: TextStyle(
+                  color: Colors.grey[400],
+                ),
+              ),
             ],
           ),
         ],
       ),
     );
   }
-  
+
   // Build a stat row for details sections
   Widget _buildStatRow(String label, String value) {
     return Padding(
@@ -755,16 +671,24 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[400],
+            ),
+          ),
           Text(
             value,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
         ],
       ),
     );
   }
-  
+
   // Build network speed indicator
   Widget _buildNetworkSpeedIndicator(String label, IconData icon, Color color, String value) {
     return Column(
@@ -774,8 +698,9 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
         const SizedBox(height: 16),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
+            color: color,
           ),
         ),
         const SizedBox(height: 8),
@@ -790,54 +715,47 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
       ],
     );
   }
-  
-  // Build data usage item for network tab
-  Widget _buildDataUsageItem(String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
+
+  // Calculate a health score based on actual metrics
+  String _calculateHealthScore(double cpuUsage, Map<String, dynamic> memoryData) {
+    double memoryUsagePercent = memoryData['total'] != null && memoryData['total'] > 0
+        ? (memoryData['used'] ?? 0) / (memoryData['total'] ?? 1) * 100
+        : 50;
+
+    double healthScore = 100 - (0.4 * cpuUsage + 0.4 * memoryUsagePercent);
+    return '${healthScore.round()}%';
   }
-  
+
+  // Get health description based on metrics
+  String _getHealthDescription(double cpuUsage, Map<String, dynamic> memoryData) {
+    double memoryUsagePercent = memoryData['total'] != null && memoryData['total'] > 0
+        ? (memoryData['used'] ?? 0) / (memoryData['total'] ?? 1) * 100
+        : 50;
+
+    if (cpuUsage > 80 || memoryUsagePercent > 80) {
+      return 'System is under heavy load';
+    } else if (cpuUsage > 60 || memoryUsagePercent > 60) {
+      return 'System is running normally';
+    } else {
+      return 'System is running optimally';
+    }
+  }
+
   // Get color for CPU usage based on value
   Color _getColorForCpuUsage(double value) {
     if (value < 50) {
-      return Colors.green;
+      return _neonGreen;
     } else if (value < 80) {
       return Colors.orange;
     } else {
       return Colors.red;
     }
   }
-  
+
   // Get color for progress indicators
   Color _getProgressColor(double progress) {
     if (progress < 0.6) {
-      return Colors.green;
+      return _neonGreen;
     } else if (progress < 0.8) {
       return Colors.orange;
     } else {

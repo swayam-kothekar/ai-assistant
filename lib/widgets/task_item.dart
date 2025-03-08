@@ -5,45 +5,59 @@ class TaskItem extends StatelessWidget {
   final String text;
   final bool isCompleted;
   final bool isCurrent;
+  final Color iconColor;
+  final Color textColor;
+  final Color backgroundColor;
 
   const TaskItem({
-    super.key,
+    Key? key,
     required this.icon,
     required this.text,
-    required this.isCompleted,
-    required this.isCurrent,
-  });
+    this.isCompleted = false,
+    this.isCurrent = false,
+    this.iconColor = Colors.blue,
+    this.textColor = Colors.black,
+    this.backgroundColor = Colors.white,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isCompleted ? Colors.green : (isCurrent ? Colors.black : Colors.white),
-              border: Border.all(
-                color: isCompleted ? Colors.green : Colors.grey[300]!,
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: isCompleted
-                ? Icon(Icons.check, color: Colors.white, size: 16)
-                : (isCurrent ? Icon(icon, color: Colors.white, size: 16) : Container()),
-            ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isCurrent ? iconColor.withOpacity(0.7) : backgroundColor,
+          width: 1.5,
+        ),
+        boxShadow: isCurrent ? [
+          BoxShadow(
+            color: iconColor.withOpacity(0.2),
+            blurRadius: 6,
+            spreadRadius: 1,
           ),
-          SizedBox(width: 15),
-          Text(
-            text,
-            style: TextStyle(
-              color: isCurrent ? Colors.black : Colors.grey[600],
-              fontSize: 16,
-              fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+        ] : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            color: iconColor,
+            size: 24,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: textColor,
+                decoration: isCompleted ? TextDecoration.lineThrough : null,
+                decorationColor: iconColor,
+                decorationThickness: 2,
+              ),
             ),
           ),
         ],
