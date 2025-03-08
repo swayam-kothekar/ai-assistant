@@ -5,6 +5,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+
+
 android {
     namespace = "com.example.ai_assistant"
     compileSdk = flutter.compileSdkVersion

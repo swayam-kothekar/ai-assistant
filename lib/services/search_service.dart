@@ -17,7 +17,7 @@ typedef TaskProgressCallback = void Function(int completedStepIndex);
 typedef ErrorCallback = void Function(String message);
 
 class GeminiService {
-  final String apiKey = 'AIzaSyCeE-c21_f2YK82bZIdMAWbDMhMVcNG0-U';
+  final String apiKey = 'AIzaSyDexyYfzl_MLDxlk3uD66XRot7j7hkESw8';
   final String baseUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent';
 
   // Process input to match regex patterns

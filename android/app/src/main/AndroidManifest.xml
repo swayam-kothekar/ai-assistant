@@ -1,8 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="ai_assistant"
+        android:label="Kairii"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <service
+    android:name=".FloatingWidgetService"
+    android:enabled="true"
+    android:exported="false"
+    android:foregroundServiceType="microphone" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -57,4 +62,9 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <uses-permission android:name="android.permission.CALL_PHONE"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 </manifest>

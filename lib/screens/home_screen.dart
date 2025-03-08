@@ -1,5 +1,7 @@
 import 'package:ai_assistant/screens/metrics_screen.dart';
+import 'package:ai_assistant/services/floating_widget_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../widgets/task_item.dart';
 import '../services/search_service.dart';
@@ -16,6 +18,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   final FocusNode _searchFocusNode = FocusNode();
   bool _isSearching = false;
   bool _isListening = false;
+  bool _isFloatingWidgetActive = false;
 
   // Animation controller for the mic button
   late AnimationController _animationController;
@@ -37,11 +40,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // Command suggestions
   final List<Map<String, dynamic>> _commandSuggestions = [
     {'icon': Icons.bar_chart, 'text': 'Metrics', 'isNavigationItem': true},
-    {'icon': Icons.calendar_today, 'text': 'Schedule Meeting'},
+    {'icon': Icons.play_arrow, 'text': 'Open youtube'},
     {'icon': Icons.alarm, 'text': 'Set a reminder'},
-    {'icon': Icons.search, 'text': 'Search in Google'},
-    {'icon': Icons.play_arrow, 'text': 'Open Youtube'},
-    {'icon': Icons.map, 'text': 'Open Maps'},
+    {'icon': Icons.search, 'text': 'Search in google'},
+    {'icon': Icons.map, 'text': 'Open maps'},
+    {'icon': Icons.calendar_today, 'text': 'Schedule Meeting today'},
   ];
 
   // Define neon colors
@@ -50,6 +53,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   final Color _neonBlue = Color.fromARGB(110, 11, 245, 139);
   final Color _darkBackground = Color(0xFF121212);
   final Color _darkSurface = Color(0xFF1E1E1E);
+
+  static const _channel = MethodChannel('com.example.ai_assistant/floating_widget');
 
   @override
   void initState() {
@@ -60,6 +65,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _setNoTasksMessage();
     // Initialize speech recognition
     _initSpeech();
+    _setupMethodChannel();
+    
     
     // Initialize animation controller
     _animationController = AnimationController(
@@ -81,6 +88,56 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         curve: const Interval(0.4, 1.0, curve: Curves.easeInOut)
       ),
     );
+  }
+
+  void _setupMethodChannel() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == "processVoiceCommand") {
+        final String command = call.arguments as String;
+        _handleVoiceCommand(command); // Handle the command
+      }
+    });
+  }
+
+  // Handle voice commands
+  void _handleVoiceCommand(String command) {
+    _searchService.processSearch(
+      searchText: command,
+      onTaskStart: _startTask,
+      onTaskProgress: _updateTaskProgress,
+      onError: _handleSearchError,
+      context: context, // Pass the BuildContext
+    );
+  }
+
+// Future<void> _checkFloatingWidgetStatus() async {
+//     final hasPermission = await FloatingWidgetController.checkOverlayPermission();
+//     // You might want to store this status or show a tutorial for first-time users
+//   }
+
+  Future<void> _toggleFloatingWidget() async {
+    if (_isFloatingWidgetActive) {
+      final stopped = await FloatingWidgetController.stopFloatingWidget();
+      if (stopped) {
+        setState(() {
+          _isFloatingWidgetActive = false;
+        });
+      }
+    } else {
+      // Check and request permission if needed
+      final hasPermission = await FloatingWidgetController.checkOverlayPermission();
+      if (!hasPermission) {
+        await FloatingWidgetController.requestOverlayPermission();
+        return;
+      }
+      
+      final started = await FloatingWidgetController.startFloatingWidget();
+      if (started) {
+        setState(() {
+          _isFloatingWidgetActive = true;
+        });
+      }
+    }
   }
 
   // Initialize speech recognition
@@ -277,333 +334,437 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-     return Scaffold(
-      backgroundColor: _darkBackground,
-      resizeToAvoidBottomInset: true,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 30),
-                // Title Bar
-                Center(
-                  child: Text(
-                    'My Assistant',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: _neonBlue,
-                      shadows: [
-                        BoxShadow(
-                          color: _neonBlue.withOpacity(0.7),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 60),
-
-                Center(
-                  child: Text(
-                    'Hello how can I help today?',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[400],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 60),
-
-                // Search Bar with neon styling
-                Container(
-                  decoration: BoxDecoration(
-                    color: _darkSurface,
-                    borderRadius: BorderRadius.circular(25),
-                    border: Border.all(
-                      color: _isListening ? _neonPink : _neonGreen.withOpacity(0.7),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _isListening ? _neonPink.withOpacity(0.3) : _neonGreen.withOpacity(0.2),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 15),
-                  height: 50,
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.search, 
-                        color: _isListening ? _neonPink : _neonGreen,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          focusNode: _searchFocusNode,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: _isListening 
-                                ? 'Listening...' 
-                                : 'Try something...',
-                            hintStyle: TextStyle(
-                              color: _isListening ? _neonPink.withOpacity(0.7) : Colors.grey[500], 
-                              fontSize: 16,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                          onSubmitted: (_) => _sendSearch(),
-                        ),
-                      ),
-                      if (_isSearching)
-                        IconButton(
-                          icon: Icon(
-                            Icons.send, 
-                            color: _neonGreen,
-                            size: 20,
-                          ),
-                          onPressed: _sendSearch,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 55),
-                
-                // Command suggestions section - horizontal scrolling
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+  return Scaffold(
+    // appBar: AppBar(
+    //   title: Text('Kairii'),
+    //   actions: [
+    //     // Add a toggle button in the app bar
+    //     IconButton(
+    //       icon: Icon(
+    //         _isFloatingWidgetActive ? Icons.mic : Icons.mic_off,
+    //         color: _isFloatingWidgetActive ? Colors.blue : Colors.grey,
+    //       ),
+    //       onPressed: _toggleFloatingWidget,
+    //     ),
+    //   ],
+    // ),
+    backgroundColor: _darkBackground,
+    resizeToAvoidBottomInset: true,
+    body: SafeArea(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 30),
+              // Title Bar
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 5, bottom: 10),
-                      child: Text(
-                        'Try asking:',
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
-                      ),
+                    Image.asset(
+                      'assets/images/logo.png',
+                      height: 40, 
+                      width: 40, 
                     ),
-                    Container(
-                      height: 90,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _commandSuggestions.length,
-                        itemBuilder: (context, index) {
-                          final suggestion = _commandSuggestions[index];
-                          final bool isNavigationItem = suggestion['isNavigationItem'] ?? false;
-                          
-                          return GestureDetector(
-                            onTap: () => _onCommandTap(suggestion['text'], isNavigationItem),
-                            child: Container(
-                              width: 110,
-                              margin: EdgeInsets.only(right: 12),
-                              decoration: BoxDecoration(
-                                color: _darkSurface,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isNavigationItem ? _neonBlue.withOpacity(0.5) : _neonGreen.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: isNavigationItem ? _neonBlue.withOpacity(0.2) : _neonGreen.withOpacity(0.1),
-                                    blurRadius: 4,
-                                    spreadRadius: 0,
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    suggestion['icon'],
-                                    color: isNavigationItem ? _neonBlue : _neonGreen,
-                                    size: 28,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    suggestion['text'],
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                    const SizedBox(width: 10),
+                    Text(
+                      'Kairii',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: _neonBlue,
+                        shadows: [
+                          BoxShadow(
+                            color: _neonBlue.withOpacity(0.7),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                
-                const SizedBox(height: 40),
+              ),
+              const SizedBox(height: 60),
 
-                // Current Task Section
-                Text(
-                  _taskRunning ? 'Current Task: $_currentTaskTitle' : 'Current Task',
+              Center(
+                child: Text(
+                  'Hello how can I help today?',
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: _neonBlue,
-                    shadows: [
-                      BoxShadow(
-                        color: _neonBlue.withOpacity(0.5),
-                        blurRadius: 4,
-                        spreadRadius: 0.5,
-                      ),
-                    ],
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[400],
                   ),
                 ),
-                const SizedBox(height: 15),
-                
-                // Task Steps
-                if (_taskSteps.isEmpty)
-                  Padding(
-                    padding: EdgeInsets.only(bottom: 15),
-                    child: Text(
-                      'No tasks currently running',
-                      style: TextStyle(
-                        color: Colors.grey[500],
-                        fontStyle: FontStyle.italic,
+              ),
+
+              const SizedBox(height: 60),
+
+              // Search Bar with neon styling
+              Container(
+                decoration: BoxDecoration(
+                  color: _darkSurface,
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(
+                    color: _isListening ? _neonPink : _neonGreen.withOpacity(0.7),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _isListening ? _neonPink.withOpacity(0.3) : _neonGreen.withOpacity(0.2),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 15),
+                height: 50,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.search, 
+                      color: _isListening ? _neonPink : _neonGreen,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: _isListening 
+                              ? 'Listening...' 
+                              : 'Try something...',
+                          hintStyle: TextStyle(
+                            color: _isListening ? _neonPink.withOpacity(0.7) : Colors.grey[500], 
+                            fontSize: 16,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onSubmitted: (_) => _sendSearch(),
                       ),
                     ),
-                  )
-                else
-                  ...List.generate(_taskSteps.length, (index) {
-                    final step = _taskSteps[index];
-                    return TaskItem(
-                      icon: step['isCompleted'] 
-                          ? Icons.assignment_turned_in 
-                          : (step['isCurrent'] ? Icons.lightbulb_outline : Icons.recommend),
-                      text: step['text'],
-                      isCompleted: step['isCompleted'],
-                      isCurrent: step['isCurrent'],
-                      // Pass theme colors to TaskItem
-                      iconColor: step['isCompleted'] 
-                          ? _neonGreen
-                          : (step['isCurrent'] ? _neonPink : Colors.grey[400]!),
-                      textColor: Colors.white,
-                      backgroundColor: _darkSurface,
-                    );
-                  }),
+                    if (_isSearching)
+                      IconButton(
+                        icon: Icon(
+                          Icons.send, 
+                          color: _neonGreen,
+                          size: 20,
+                        ),
+                        onPressed: _sendSearch,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 55),
+              
+              // Command suggestions section - horizontal scrolling
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 5, bottom: 10),
+                    child: Text(
+                      'Try asking:',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    height: 90,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _commandSuggestions.length,
+                      itemBuilder: (context, index) {
+                        final suggestion = _commandSuggestions[index];
+                        final bool isNavigationItem = suggestion['isNavigationItem'] ?? false;
+                        
+                        return GestureDetector(
+                          onTap: () => _onCommandTap(suggestion['text'], isNavigationItem),
+                          child: Container(
+                            width: 110,
+                            margin: EdgeInsets.only(right: 12),
+                            decoration: BoxDecoration(
+                              color: _darkSurface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isNavigationItem ? _neonBlue.withOpacity(0.5) : _neonGreen.withOpacity(0.3),
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: isNavigationItem ? _neonBlue.withOpacity(0.2) : _neonGreen.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  spreadRadius: 0,
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  suggestion['icon'],
+                                  color: isNavigationItem ? _neonBlue : _neonGreen,
+                                  size: 28,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  suggestion['text'],
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 40),
 
-                const SizedBox(height: 30),
-                  
-                const SizedBox(height: 80),
-              ],
-            ),
+              // Floating Widget Control Section (New)
+              Container(
+                decoration: BoxDecoration(
+                  color: _darkSurface,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                    color: _isFloatingWidgetActive ? _neonBlue.withOpacity(0.7) : Colors.grey.withOpacity(0.3),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _isFloatingWidgetActive ? _neonBlue.withOpacity(0.3) : Colors.transparent,
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.assistant,
+                          color: _isFloatingWidgetActive ? _neonBlue : Colors.grey[400],
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Voice Assistant',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _isFloatingWidgetActive
+                          ? 'Voice assistant is active and listening for commands outside the app'
+                          : 'Enable voice assistant to use commands even when app is closed',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: _toggleFloatingWidget,
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: _isFloatingWidgetActive ? Colors.black : _neonBlue, backgroundColor: _isFloatingWidgetActive ? _neonBlue : _darkSurface,
+                          side: BorderSide(
+                            color: _neonBlue.withOpacity(0.7),
+                            width: 1,
+                          ),
+                          shadowColor: _isFloatingWidgetActive ? _neonBlue.withOpacity(0.5) : Colors.transparent,
+                          elevation: _isFloatingWidgetActive ? 5 : 0,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: Text(
+                            _isFloatingWidgetActive
+                                ? 'Disable Floating Assistant'
+                                : 'Enable Floating Assistant',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 40),
+
+              // Current Task Section
+              Text(
+                _taskRunning ? 'Current Task: $_currentTaskTitle' : 'Current Task',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: _neonBlue,
+                  shadows: [
+                    BoxShadow(
+                      color: _neonBlue.withOpacity(0.5),
+                      blurRadius: 4,
+                      spreadRadius: 0.5,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 15),
+              
+              // Task Steps
+              if (_taskSteps.isEmpty)
+                Padding(
+                  padding: EdgeInsets.only(bottom: 15),
+                  child: Text(
+                    'No tasks currently running',
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                )
+              else
+                ...List.generate(_taskSteps.length, (index) {
+                  final step = _taskSteps[index];
+                  return TaskItem(
+                    icon: step['isCompleted'] 
+                        ? Icons.assignment_turned_in 
+                        : (step['isCurrent'] ? Icons.lightbulb_outline : Icons.recommend),
+                    text: step['text'],
+                    isCompleted: step['isCompleted'],
+                    isCurrent: step['isCurrent'],
+                    // Pass theme colors to TaskItem
+                    iconColor: step['isCompleted'] 
+                        ? _neonGreen
+                        : (step['isCurrent'] ? _neonPink : Colors.grey[400]!),
+                    textColor: Colors.white,
+                    backgroundColor: _darkSurface,
+                  );
+                }),
+
+              const SizedBox(height: 30),
+                
+              const SizedBox(height: 80),
+            ],
           ),
         ),
       ),
-      floatingActionButton: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              // Outer ripple effect (only when listening)
-              if (_isListening)
-                Transform.scale(
-                  scale: _secondPulseAnimation.value,
-                  child: Container(
-                    width: 75,
-                    height: 75,
-                    decoration: BoxDecoration(
-                      color: _neonPink.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-                
-              // Inner ripple effect (only when listening)
-              if (_isListening)
-                Transform.scale(
-                  scale: _pulseAnimation.value,
-                  child: Container(
-                    width: 75,
-                    height: 75,
-                    decoration: BoxDecoration(
-                      color: _neonPink.withOpacity(0.25),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-                
-              // Main FAB with animation
+    ),
+    floatingActionButton: AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            // Outer ripple effect (only when listening)
+            if (_isListening)
               Transform.scale(
-                scale: _isListening ? _scaleAnimation.value : 1.0,
+                scale: _secondPulseAnimation.value,
                 child: Container(
-                  width: 100,
-                  height: 100,
+                  width: 75,
+                  height: 75,
                   decoration: BoxDecoration(
-                    gradient: _isListening 
-                      ? LinearGradient(
-                          colors: [_neonPink, _neonPink.withOpacity(0.7)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : LinearGradient(
-                          colors: [_neonGreen.withOpacity(0.9), _neonGreen.withOpacity(0.6)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                    color: _neonPink.withOpacity(0.1),
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: _isListening 
-                            ? _neonPink.withOpacity(0.5) 
-                            : _neonGreen.withOpacity(0.5),
-                        spreadRadius: 2,
-                        blurRadius: 10,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
                   ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _isListening ? _stopListening : _startListening,
-                      customBorder: CircleBorder(),
-                      child: Center(
-                        child: Icon(
-                          _isListening ? Icons.stop : Icons.mic,
-                          color: Colors.black,
-                          size: 45,
-                        ),
+                ),
+              ),
+              
+            // Inner ripple effect (only when listening)
+            if (_isListening)
+              Transform.scale(
+                scale: _pulseAnimation.value,
+                child: Container(
+                  width: 75,
+                  height: 75,
+                  decoration: BoxDecoration(
+                    color: _neonPink.withOpacity(0.25),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              
+            // Main FAB with animation
+            Transform.scale(
+              scale: _isListening ? _scaleAnimation.value : 1.0,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  gradient: _isListening 
+                    ? LinearGradient(
+                        colors: [_neonPink, _neonPink.withOpacity(0.7)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : LinearGradient(
+                        colors: [_neonGreen.withOpacity(0.9), _neonGreen.withOpacity(0.6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _isListening 
+                          ? _neonPink.withOpacity(0.5) 
+                          : _neonGreen.withOpacity(0.5),
+                      spreadRadius: 2,
+                      blurRadius: 10,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _isListening ? _stopListening : _startListening,
+                    customBorder: CircleBorder(),
+                    child: Center(
+                      child: Icon(
+                        _isListening ? Icons.stop : Icons.mic,
+                        color: Colors.black,
+                        size: 45,
                       ),
                     ),
                   ),
                 ),
               ),
-            ],
-          );
-        },
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-    );
-  }
+            ),
+          ],
+        );
+      },
+    ),
+    floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+  );
+}
 }
 
 // Simple Metrics Screen to navigate to
