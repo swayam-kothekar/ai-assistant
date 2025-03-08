@@ -6,14 +6,106 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart'; // For date formatting
-// import 'package:contacts_service/contacts_service.dart'; // For accessing contacts
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 // Callback types for updating UI state
 typedef TaskStartCallback = void Function(String taskTitle, List<String> steps);
 typedef TaskProgressCallback = void Function(int completedStepIndex);
 typedef ErrorCallback = void Function(String message);
+
+class GeminiService {
+  final String apiKey = 'AIzaSyCeE-c21_f2YK82bZIdMAWbDMhMVcNG0-U';
+  final String baseUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent';
+
+  // Process input to match regex patterns
+  String processInput(String input) {
+    // Define commands and their standard formats
+    final Map<String, RegExp> patterns = {
+      'youtube_search': RegExp(r'^(?:open\s+youtube\s+and\s+search|search\s+(?:on|in)\s+youtube\s+for|youtube\s+search)(?:\s+for)?\s+(.+)$', caseSensitive: false),
+      'youtube_open': RegExp(r'^open\s+youtube$', caseSensitive: false),
+      'calendar_open': RegExp(r'^open\s+(?:my\s+)?calendar$', caseSensitive: false),
+      'add_event': RegExp(r'^(?:add|create|schedule)(?:\s+a)?(?:\s+new)?(?:\s+meeting|event|appointment|birthday)(?:\s+(?:on|in|to)(?:\s+my)?(?:\s+calendar))?\s+(.+)$', caseSensitive: false),
+      'view_date': RegExp(r'^(?:show|view|open|check)(?:\s+my)?(?:\s+calendar)(?:\s+for)?\s+(.+)$', caseSensitive: false),
+      'maps_open': RegExp(r'^open\s+(?:google\s+)?maps$', caseSensitive: false),
+      'gmail_open': RegExp(r'^open\s+gmail$', caseSensitive: false),
+      'settings_open': RegExp(r'^open\s+settings$', caseSensitive: false),
+      'camera_open': RegExp(r'^open\s+camera$', caseSensitive: false),
+      'gallery_open': RegExp(r'^open\s+(?:gallery|photos)$', caseSensitive: false),
+    };
+
+    // Check if input matches any pattern and standardize it
+    for (var entry in patterns.entries) {
+      final match = entry.value.firstMatch(input);
+      if (match != null) {
+        switch (entry.key) {
+          case 'youtube_search':
+            final query = match.group(1) ?? '';
+            return 'search on youtube for $query';
+          case 'youtube_open':
+            return 'open youtube';
+          case 'calendar_open':
+            return 'open calendar';
+          case 'add_event':
+            final details = match.group(1) ?? '';
+            return 'add event $details';
+          case 'view_date':
+            final date = match.group(1) ?? '';
+            return 'view calendar for $date';
+          case 'maps_open':
+            return 'open maps';
+          case 'gmail_open':
+            return 'open gmail';
+          case 'settings_open':
+            return 'open settings';
+          case 'camera_open':
+            return 'open camera';
+          case 'gallery_open':
+            return 'open gallery';
+        }
+      }
+    }
+
+    // If no pattern matches, return the original input
+    return input;
+  }
+
+  // Method to send processed user input to the Gemini API
+  Future<String> getResponse(String input) async {
+    // Process the input before sending to Gemini
+    final processedInput = processInput(input);
+    
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl?key=$apiKey'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {'text': processedInput}
+              ]
+            }
+          ]
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // Parse the API response
+        final data = jsonDecode(response.body);
+        return data['candidates'][0]['content']['parts'][0]['text'];
+      } else {
+        throw Exception('Failed to load response: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to connect to the API: $e');
+    }
+  }
+}
 
 class SearchService {
   // Translation map for Hinglish to English
@@ -41,6 +133,11 @@ class SearchService {
     'aaj ka plan batao': 'show plan for today',
   };
 
+  final GeminiService _geminiService;
+  
+  // Add a constructor to initialize the field
+  SearchService() : _geminiService = GeminiService();
+
   final FlutterTts _flutterTts = FlutterTts();
 
   // Future<void> _initTts() async {
@@ -58,10 +155,10 @@ class SearchService {
     caseSensitive: false,
   );
 
-  static final RegExp _paymentPattern = RegExp(
-  r'^pay\s+(?:rs|rupees?)?\s*(\d+)\s+(?:rs|rupees?)?\s+to\s+(.+)$',
-  caseSensitive: false,
-  );
+  // static final RegExp _paymentPattern = RegExp(
+  // r'^pay\s+(?:rs|rupees?)?\s*(\d+)\s+(?:rs|rupees?)?\s+to\s+(.+)$',
+  // caseSensitive: false,
+  // );
 
   // Method to translate Hinglish to English
   String _translateHinglishToEnglish(String input) {
@@ -73,63 +170,63 @@ class SearchService {
   }
 
   // Regular expressions for detecting YouTube commands
-  static final RegExp _youtubeSearchPattern = RegExp(
-    r'^(?:open\s+youtube\s+and\s+search|search\s+(?:on|in)\s+youtube\s+for|youtube\s+search)(?:\s+for)?\s+(.+)$',
-    caseSensitive: false,
-  );
+  // static final RegExp _youtubeSearchPattern = RegExp(
+  //   r'^(?:open\s+youtube\s+and\s+search|search\s+(?:on|in)\s+youtube\s+for|youtube\s+search)(?:\s+for)?\s+(.+)$',
+  //   caseSensitive: false,
+  // );
 
   static final RegExp _youtubeOpenPattern = RegExp(
     r'^open\s+youtube$',
     caseSensitive: false,
   );
 
-  // Regular expression for detecting Google search commands
-  static final RegExp _googleSearchPattern = RegExp(
-    r'^(?:search\s+(?:on|in)\s+google\s+for|google\s+search)(?:\s+for)?\s+(.+)$',
-    caseSensitive: false,
-  );
+  // // Regular expression for detecting Google search commands
+  // static final RegExp _googleSearchPattern = RegExp(
+  //   r'^(?:search\s+(?:on|in)\s+google\s+for|google\s+search)(?:\s+for)?\s+(.+)$',
+  //   caseSensitive: false,
+  // );
 
-  // Calendar patterns for various calendar commands
-  static final RegExp _calendarOpenPattern = RegExp(
-    r'^open\s+(?:my\s+)?calendar$',
-    caseSensitive: false,
-  );
+  // // Calendar patterns for various calendar commands
+  // static final RegExp _calendarOpenPattern = RegExp(
+  //   r'^open\s+(?:my\s+)?calendar$',
+  //   caseSensitive: false,
+  // );
 
-  static final RegExp _addEventPattern = RegExp(
-    r'^(?:add|create|schedule)(?:\s+a)?(?:\s+new)?(?:\s+meeting|event|appointment)(?:\s+(?:on|in|to)(?:\s+my)?(?:\s+calendar))?\s+(.+)$',
-    caseSensitive: false,
-  );
+  // static final RegExp _addEventPattern = RegExp(
+  //   r'^(?:add|create|schedule)(?:\s+a)?(?:\s+new)?(?:\s+meeting|event|appointment)(?:\s+(?:on|in|to)(?:\s+my)?(?:\s+calendar))?\s+(.+)$',
+  //   caseSensitive: false,
+  // );
 
-  static final RegExp _viewDatePattern = RegExp(
-    r'^(?:show|view|open|check)(?:\s+my)?(?:\s+calendar)(?:\s+for)?\s+(.+)$',
-    caseSensitive: false,
-  );
+  // static final RegExp _viewDatePattern = RegExp(
+  //   r'^(?:show|view|open|check)(?:\s+my)?(?:\s+calendar)(?:\s+for)?\s+(.+)$',
+  //   caseSensitive: false,
+  // );
 
-  // Regular expressions for detecting app-specific commands
-  static final RegExp _mapsOpenPattern = RegExp(
-    r'^open\s+(?:google\s+)?maps$',
-    caseSensitive: false,
-  );
+  // // Regular expressions for detecting app-specific commands
+  // static final RegExp _mapsOpenPattern = RegExp(
+  //   r'^open\s+(?:google\s+)?maps$',
+  //   caseSensitive: false,
+  // );
 
-  static final RegExp _gmailOpenPattern = RegExp(
-    r'^open\s+gmail$',
-    caseSensitive: false,
-  );
+  // static final RegExp _gmailOpenPattern = RegExp(
+  //   r'^open\s+gmail$',
+  //   caseSensitive: false,
+  // );
 
-  static final RegExp _settingsOpenPattern = RegExp(
-    r'^open\s+settings$',
-    caseSensitive: false,
-  );
+  // static final RegExp _settingsOpenPattern = RegExp(
+  //   r'^open\s+settings$',
+  //   caseSensitive: false,
+  // );
 
-  static final RegExp _cameraOpenPattern = RegExp(
-    r'^open\s+camera$',
-    caseSensitive: false,
-  );
+  // static final RegExp _cameraOpenPattern = RegExp(
+  //   r'^open\s+camera$',
+  //   caseSensitive: false,
+  // );
 
-  static final RegExp _galleryOpenPattern = RegExp(
-    r'^open\s+(?:gallery|photos)$',
-    caseSensitive: false,
-  );
+  // static final RegExp _galleryOpenPattern = RegExp(
+  //   r'^open\s+(?:gallery|photos)$',
+  //   caseSensitive: false,
+  // );
 
   // Helper method to extract date, time, and title from meeting description
   Map<String, dynamic> _extractEventDetails(String description) {
@@ -252,37 +349,47 @@ class SearchService {
     required ErrorCallback onError,
     required BuildContext context,
   }) async {
-    // Translate Hinglish to English
-    final translatedText = _translateHinglishToEnglish(searchText);
-    final trimmedText = translatedText.trim();
+    onTaskStart("Processing Input", [
+    "Analyzing your request",
+    "Determining the best action",
+  ]);
 
-    // Check if text matches call pattern
-    final callMatch = _callPattern.firstMatch(trimmedText);
+  onTaskProgress(0);
 
-    // Check if text matches payment pattern
-    final paymentMatch = _paymentPattern.firstMatch(trimmedText);
+  // Translate Hinglish to English if needed
+  final translatedText = _translateHinglishToEnglish(searchText);
+  final trimmedText = translatedText.trim();
 
-    // Check if text matches Google search pattern
-    final googleSearchMatch = _googleSearchPattern.firstMatch(trimmedText);
+    try {
+    // Use Gemini API for NLP processing
+    final prompt = '''
+    Analyze this user command: "$trimmedText"
+    
+    Respond with ONLY ONE of these exact commands (no additional text):
+    - "CALL: [name]" (if user wants to call someone)
+    - "PAY: [amount]" (if user wants to make a payment)
+    - "GOOGLE: [query]" (if user wants to search Google)
+    - "YOUTUBE_SEARCH: [query]" (if user wants to search YouTube)
+    - "OPEN_YOUTUBE" (if user wants to open YouTube)
+    - "OPEN_CALENDAR" (if user wants to open the calendar)
+    - "ADD_EVENT: [details]" (if user wants to add calendar event)
+    - "VIEW_DATE: [date]" (if user wants to view a specific date)
+    - "OPEN_MAPS" (if user wants to open Maps)
+    - "OPEN_GMAIL" (if user wants to open Gmail)
+    - "OPEN_SETTINGS" (if user wants to open Settings)
+    - "OPEN_CAMERA" (if user wants to open Camera)
+    - "OPEN_GALLERY" (if user wants to open Gallery/Photos)
+    - "UNKNOWN" (if the command doesn't match any of the above)
+    ''';
 
-    // Check if text matches YouTube patterns
-    final youtubeSearchMatch = _youtubeSearchPattern.firstMatch(trimmedText);
-    final isYoutubeOpen = _youtubeOpenPattern.hasMatch(trimmedText);
-
-    // Check if text matches Calendar patterns
-    final isCalendarOpen = _calendarOpenPattern.hasMatch(trimmedText);
-    final addEventMatch = _addEventPattern.firstMatch(trimmedText);
-    final viewDateMatch = _viewDatePattern.firstMatch(trimmedText);
-
-    // Check if text matches app-specific patterns
-    final isMapsOpen = _mapsOpenPattern.hasMatch(trimmedText);
-    final isGmailOpen = _gmailOpenPattern.hasMatch(trimmedText);
-    final isSettingsOpen = _settingsOpenPattern.hasMatch(trimmedText);
-    final isCameraOpen = _cameraOpenPattern.hasMatch(trimmedText);
-    final isGalleryOpen = _galleryOpenPattern.hasMatch(trimmedText);
-
-    if (callMatch != null) {
-      final name = callMatch.group(1)?.trim() ?? '';
+    final String nlpResult = await _geminiService.getResponse(prompt);
+    print("NLP Result: $nlpResult"); // Debug output
+    
+    onTaskProgress(1);
+    
+    // Parse the NLP result
+    if (nlpResult.startsWith("CALL:")) {
+      final name = nlpResult.substring("CALL:".length).trim();
       await _handleCall(
         name: name,
         onTaskStart: onTaskStart,
@@ -290,92 +397,94 @@ class SearchService {
         onError: onError,
         context: context,
       );
-    } else if (paymentMatch != null) {
-      final amount = paymentMatch.group(1);
-      // final name = paymentMatch.group(2)?.trim() ?? '';
+    } else if (nlpResult.startsWith("PAY:")) {
+      final amount = nlpResult.substring("PAY:".length).trim();
       await _handlePayment(
-        amount: amount ?? '',
-        // name: name,
+        amount: amount,
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-      } else if (googleSearchMatch != null) {
+    } else if (nlpResult.startsWith("GOOGLE:")) {
+      final query = nlpResult.substring("GOOGLE:".length).trim();
       await _handleGoogleSearch(
-        searchQuery: googleSearchMatch.group(1)?.trim() ?? '',
+        searchQuery: query,
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-    } else if (youtubeSearchMatch != null) {
+    } else if (nlpResult.startsWith("YOUTUBE_SEARCH:")) {
+      final query = nlpResult.substring("YOUTUBE_SEARCH:".length).trim();
       await _handleYoutubeSearch(
-        searchQuery: youtubeSearchMatch.group(1)?.trim() ?? '',
+        searchQuery: query,
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-    } else if (isYoutubeOpen) {
+    } else if (nlpResult == "OPEN_YOUTUBE") {
       await _handleYoutubeOpen(
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-    } else if (isCalendarOpen) {
+    } else if (nlpResult == "OPEN_CALENDAR") {
       await _handleCalendarOpen(
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-    } else if (addEventMatch != null) {
+    } else if (nlpResult.startsWith("ADD_EVENT:")) {
+      final details = nlpResult.substring("ADD_EVENT:".length).trim();
       await _handleAddCalendarEvent(
-        eventDescription: addEventMatch.group(1)?.trim() ?? '',
+        eventDescription: details,
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-    } else if (viewDateMatch != null) {
+    } else if (nlpResult.startsWith("VIEW_DATE:")) {
+      final date = nlpResult.substring("VIEW_DATE:".length).trim();
       await _handleViewCalendarDate(
-        dateDescription: viewDateMatch.group(1)?.trim() ?? '',
+        dateDescription: date,
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-    } else if (isMapsOpen) {
+    } else if (nlpResult == "OPEN_MAPS") {
       await _handleMapsOpen(
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-    } else if (isGmailOpen) {
+    } else if (nlpResult == "OPEN_GMAIL") {
       await _handleGmailOpen(
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-    } else if (isSettingsOpen) {
+    } else if (nlpResult == "OPEN_SETTINGS") {
       await _handleSettingsOpen(
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-    } else if (isCameraOpen) {
+    } else if (nlpResult == "OPEN_CAMERA") {
       await _handleCameraOpen(
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
         onError: onError,
         context: context,
       );
-    } else if (isGalleryOpen) {
+    } else if (nlpResult == "OPEN_GALLERY") {
       await _handleGalleryOpen(
         onTaskStart: onTaskStart,
         onTaskProgress: onTaskProgress,
@@ -383,6 +492,18 @@ class SearchService {
         context: context,
       );
     } else {
+      // Fallback to regex patterns as a backup
+      if (_tryFallbackPatterns(
+        text: trimmedText,
+        onTaskStart: onTaskStart,
+        onTaskProgress: onTaskProgress,
+        onError: onError,
+        context: context,
+      )) {
+        return;
+      }
+      
+      // If all else fails, handle as unrecognized command
       await _handleUnrecognizedCommand(
         command: trimmedText,
         onTaskStart: onTaskStart,
@@ -390,7 +511,66 @@ class SearchService {
         context: context,
       );
     }
+  } catch (e) {
+    print("Error processing request: $e"); // Debug output
+    
+    // Fallback to regex patterns if NLP fails
+    if (_tryFallbackPatterns(
+      text: trimmedText,
+      onTaskStart: onTaskStart,
+      onTaskProgress: onTaskProgress,
+      onError: onError,
+      context: context,
+    )) {
+      return;
+    }
+    
+    onError("Failed to process your request: $e");
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to process your request: $e')),
+      );
+    }
   }
+}
+
+bool _tryFallbackPatterns({
+  required String text,
+  required TaskStartCallback onTaskStart,
+  required TaskProgressCallback onTaskProgress,
+  required ErrorCallback onError,
+  required BuildContext context,
+}) {
+  // Check if text matches call pattern
+  final callMatch = _callPattern.firstMatch(text);
+  if (callMatch != null) {
+    final name = callMatch.group(1)?.trim() ?? '';
+    _handleCall(
+      name: name,
+      onTaskStart: onTaskStart,
+      onTaskProgress: onTaskProgress,
+      onError: onError,
+      context: context,
+    );
+    return true;
+  }
+
+  // YouTube open pattern matching as fallback
+  if (_youtubeOpenPattern.hasMatch(text)) {
+    _handleYoutubeOpen(
+      onTaskStart: onTaskStart,
+      onTaskProgress: onTaskProgress,
+      onError: onError,
+      context: context,
+    );
+    return true;
+  }
+  
+  // Add other pattern checks here as fallbacks
+  // e.g., check for _cameraOpenPattern, etc.
+  
+  return false; // No pattern matched
+}
 
  Future<void> _handleCall({
   required String name,
