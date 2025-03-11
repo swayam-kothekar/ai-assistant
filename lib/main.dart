@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/home_screen.dart';
 import 'services/floating_widget_controller.dart'; // This will be the new file we create
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Important for platform channels
+  await dotenv.load(fileName: ".env");
   runApp(MyApp());
 }
 
@@ -27,7 +29,7 @@ class _MyAppState extends State<MyApp> {
       // Process the voice command
       // This will handle commands even when app is in background
       print("Received voice command: $command");
-      
+
       // You can add logic here to process the command
       // or route it to appropriate handler in your app
     });
@@ -40,10 +42,7 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: Colors.white,
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.white,
-          elevation: 0,
-        ),
+        appBarTheme: AppBarTheme(backgroundColor: Colors.white, elevation: 0),
       ),
       home: HomeScreen(),
       debugShowCheckedModeBanner: false,
