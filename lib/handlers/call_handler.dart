@@ -50,9 +50,12 @@ Future<void> handleCall({
     return;
   }
 
-  Contact? selectedContact = matchingContacts.length == 1
-      ? matchingContacts.first
-      : await showContactSelectionDialog(context: context, contacts: matchingContacts);
+  Contact? selectedContact;
+  if (matchingContacts.length == 1) {
+    selectedContact = matchingContacts.first;
+  } else if (context.mounted) {
+    selectedContact = await showContactSelectionDialog(context: context, contacts: matchingContacts);
+  }
 
   if (selectedContact == null) {
     onError("No contact selected");
@@ -66,7 +69,10 @@ Future<void> handleCall({
 
   onTaskProgress(2);
 
-  final shouldCall = await showCallConfirmationDialog(context: context, contactName: selectedContact.displayName);
+  bool shouldCall = false;
+  if (context.mounted) {
+    shouldCall = await showCallConfirmationDialog(context: context, contactName: selectedContact.displayName);
+  }
 
   if (!shouldCall) {
     onError("Call cancelled");

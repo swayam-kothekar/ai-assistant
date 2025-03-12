@@ -80,7 +80,7 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
             fontWeight: FontWeight.bold,
             shadows: [
               BoxShadow(
-                color: _neonBlue.withOpacity(0.7),
+                color: _neonBlue.withAlpha(179), // 0.7 * 255 = ~179
                 blurRadius: 8,
                 spreadRadius: 1,
               ),
@@ -202,7 +202,7 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: _neonGreen.withOpacity(0.3),
+                color: _neonGreen.withAlpha(77), // 0.3 * 255 = ~77
                 width: 1,
               ),
             ),
@@ -276,7 +276,7 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: _neonGreen.withOpacity(0.3),
+                color: _neonGreen.withAlpha(77),
                 width: 1,
               ),
             ),
@@ -348,7 +348,7 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: _neonGreen.withOpacity(0.3),
+                color: _neonGreen.withAlpha(77),
                 width: 1,
               ),
             ),
@@ -410,7 +410,7 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
       shape: BoxShape.circle,
       color: _darkSurface,
       border: Border.all(
-        color: _neonGreen.withOpacity(0.3),
+        color: _neonGreen.withAlpha(77),
         width: 1,
       ),
     ),
@@ -465,7 +465,7 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: _neonGreen.withOpacity(0.3),
+                color: _neonGreen.withAlpha(77),
                 width: 1,
               ),
             ),
@@ -527,7 +527,7 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: _neonGreen.withOpacity(0.3),
+                color: _neonGreen.withAlpha(77),
                 width: 1,
               ),
             ),
@@ -575,7 +575,7 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
               color: _darkSurface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: _neonGreen.withOpacity(0.3),
+                color: _neonGreen.withAlpha(77),
                 width: 1,
               ),
             ),
@@ -614,7 +614,7 @@ class _MetricsScreenState extends State<MetricsScreen> with SingleTickerProvider
         color: _darkSurface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withAlpha(77), // 0.3 * 255 = ~77
           width: 1,
         ),
       ),

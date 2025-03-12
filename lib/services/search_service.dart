@@ -6,6 +6,7 @@ import 'package:ai_assistant/handlers/payment_handler.dart';
 import 'package:ai_assistant/handlers/unrecognized_command_handler.dart';
 import 'package:ai_assistant/handlers/youtube_handler.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -15,7 +16,7 @@ typedef TaskProgressCallback = void Function(int completedStepIndex);
 typedef ErrorCallback = void Function(String message);
 
 class GeminiService {
-  final String apiKey = 'AIzaSyCDXgdgziUvSn-CV9Lmpe7pAIp7HJcDPCo';
+  final String apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
   final String baseUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent';
 
   // Process input to match regex patterns
@@ -145,10 +146,7 @@ class SearchService {
     caseSensitive: false,
   );
 
-  // static final RegExp _paymentPattern = RegExp(
-  // r'^pay\s+(?:rs|rupees?)?\s*(\d+)\s+(?:rs|rupees?)?\s+to\s+(.+)$',
-  // caseSensitive: false,
-  // );
+
 
   // Method to translate Hinglish to English
   String _translateHinglishToEnglish(String input) {
@@ -159,64 +157,11 @@ class SearchService {
     return translatedText.trim();
   }
 
-  // Regular expressions for detecting YouTube commands
-  // static final RegExp _youtubeSearchPattern = RegExp(
-  //   r'^(?:open\s+youtube\s+and\s+search|search\s+(?:on|in)\s+youtube\s+for|youtube\s+search)(?:\s+for)?\s+(.+)$',
-  //   caseSensitive: false,
-  // );
 
   static final RegExp _youtubeOpenPattern = RegExp(
     r'^open\s+youtube$',
     caseSensitive: false,
   );
-
-  // // Regular expression for detecting Google search commands
-  // static final RegExp _googleSearchPattern = RegExp(
-  //   r'^(?:search\s+(?:on|in)\s+google\s+for|google\s+search)(?:\s+for)?\s+(.+)$',
-  //   caseSensitive: false,
-  // );
-
-  // // Calendar patterns for various calendar commands
-  // static final RegExp _calendarOpenPattern = RegExp(
-  //   r'^open\s+(?:my\s+)?calendar$',
-  //   caseSensitive: false,
-  // );
-
-  // static final RegExp _addEventPattern = RegExp(
-  //   r'^(?:add|create|schedule)(?:\s+a)?(?:\s+new)?(?:\s+meeting|event|appointment)(?:\s+(?:on|in|to)(?:\s+my)?(?:\s+calendar))?\s+(.+)$',
-  //   caseSensitive: false,
-  // );
-
-  // static final RegExp _viewDatePattern = RegExp(
-  //   r'^(?:show|view|open|check)(?:\s+my)?(?:\s+calendar)(?:\s+for)?\s+(.+)$',
-  //   caseSensitive: false,
-  // );
-
-  // // Regular expressions for detecting app-specific commands
-  // static final RegExp _mapsOpenPattern = RegExp(
-  //   r'^open\s+(?:google\s+)?maps$',
-  //   caseSensitive: false,
-  // );
-
-  // static final RegExp _gmailOpenPattern = RegExp(
-  //   r'^open\s+gmail$',
-  //   caseSensitive: false,
-  // );
-
-  // static final RegExp _settingsOpenPattern = RegExp(
-  //   r'^open\s+settings$',
-  //   caseSensitive: false,
-  // );
-
-  // static final RegExp _cameraOpenPattern = RegExp(
-  //   r'^open\s+camera$',
-  //   caseSensitive: false,
-  // );
-
-  // static final RegExp _galleryOpenPattern = RegExp(
-  //   r'^open\s+(?:gallery|photos)$',
-  //   caseSensitive: false,
-  // );
 
   // Helper method to extract date, time, and title from meeting description
   Map<String, dynamic> extractEventDetails(String description) {
@@ -373,7 +318,7 @@ class SearchService {
     ''';
 
     final String nlpResult = await _geminiService.getResponse(prompt);
-    print("NLP Result: $nlpResult"); // Debug output
+    // print("NLP Result: $nlpResult"); // Debug output
     
     onTaskProgress(1);
     

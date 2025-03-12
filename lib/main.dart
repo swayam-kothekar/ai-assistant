@@ -28,7 +28,7 @@ class _MyAppState extends State<MyApp> {
     await FloatingWidgetController.initialize((command) {
       // Process the voice command
       // This will handle commands even when app is in background
-      print("Received voice command: $command");
+      // print("Received voice command: $command");
 
       // You can add logic here to process the command
       // or route it to appropriate handler in your app

@@ -25,8 +25,8 @@ class FloatingWidgetController {
     try {
       final bool result = await _channel.invokeMethod('startFloatingWidget');
       return result;
-    } on PlatformException catch (e) {
-      print("Failed to start floating widget: ${e.message}");
+    } on PlatformException {
+      // print("Failed to start floating widget: ${e.message}");
       return false;
     }
   }
@@ -36,8 +36,8 @@ class FloatingWidgetController {
     try {
       final bool result = await _channel.invokeMethod('stopFloatingWidget');
       return result;
-    } on PlatformException catch (e) {
-      print("Failed to stop floating widget: ${e.message}");
+    } on PlatformException {
+      // print("Failed to stop floating widget: ${e.message}");
       return false;
     }
   }
@@ -47,8 +47,8 @@ class FloatingWidgetController {
     try {
       final bool hasPermission = await _channel.invokeMethod('checkOverlayPermission');
       return hasPermission;
-    } on PlatformException catch (e) {
-      print("Failed to check overlay permission: ${e.message}");
+    } on PlatformException {
+      // print("Failed to check overlay permission: ${e.message}");
       return false;
     }
   }
@@ -57,8 +57,8 @@ class FloatingWidgetController {
   static Future<void> requestOverlayPermission() async {
     try {
       await _channel.invokeMethod('requestOverlayPermission');
-    } on PlatformException catch (e) {
-      print("Failed to request overlay permission: ${e.message}");
+    } on PlatformException {
+      // print("Failed to request overlay permission: ${e.message}");
     }
   }
 }
