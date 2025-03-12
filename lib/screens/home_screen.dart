@@ -50,9 +50,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   // Material colors
   final Color _neonGreen = Color(0xFF00E676); // Google Green
-  final Color _darkBackground = Color(
-    0xFF121212,
-  ); // Google Dark theme background
+  final Color _darkBackground = Color(0xFF121212); // Google Dark theme background
   final Color _darkSurface = Color(0xFF1E1E1E); // Google Dark theme surface
   final Color _secondaryColor = Color(0xFFFF5252); // Accent color for listening
 
